@@ -146,26 +146,38 @@ export function App({ transport, initialLang = 'en' }: AppProps) {
     }
   }, [kind, map, loadMap, transport, resume, fail, t]);
 
-  useEffect(() => transport.listen({
-    onStartClimb: (k, since) => {
-      setKind(k);
-      void start(k, since);
-    },
-    onSelectSegment: (order) => {
-      setFocus(order);
-      setCpIndex(0);
-      setView(IDLE);
-      setScreen('climbing');
-    },
-    onLocate: (_file, line) => {
-      setView((v) => (v.state === 'idle' || v.state === 'hint' ? { ...v, line } : v));
-      pendingLocate.current = line;
-    },
-  }), [transport, start]);
+  const startRef = useRef(start);
+  startRef.current = start;
+  const locateActive = useRef(false);
+
+  useEffect(() => {
+    const off = transport.listen({
+      onStartClimb: (k, since) => {
+        setKind(k);
+        void startRef.current(k, since);
+      },
+      onSelectSegment: (order) => {
+        setFocus(order);
+        setCpIndex(0);
+        setView(IDLE);
+        setScreen('climbing');
+      },
+      onLocate: (_file, line) => {
+        if (!locateActive.current) return;
+        pendingLocate.current = line;
+        setView((v) => (v.state === 'idle' || v.state === 'hint' ? { ...v, line } : v));
+      },
+    });
+    transport.ready?.();
+    return off;
+  }, [transport]);
 
   const segment = useMemo(() => trail?.segments.find((s) => s.order === focus) ?? null, [trail, focus]);
   const mainSegments = useMemo(() => trail?.segments.filter((s) => !s.detour) ?? [], [trail]);
   const checkpoint = segment?.checkpoints[cpIndex] ?? null;
+  locateActive.current = screen === 'climbing' && checkpoint?.type === 'locate'
+    && (view.state === 'idle' || view.state === 'hint')
+    && !(segment && checkpoint && checkpointDone(progress, segment, checkpoint.id));
 
   // Segment data: guide, code (web) and editor highlight (VS Code).
   useEffect(() => {

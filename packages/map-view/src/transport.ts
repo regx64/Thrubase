@@ -14,6 +14,8 @@ export interface HostEvents {
   onStartClimb?: (kind: 'full' | 'diff', since?: string) => void;
   /** VS Code: the user picked a segment in the sidebar trail list. */
   onSelectSegment?: (order: number) => void;
+  /** VS Code: the climb changed elsewhere (sidebar map follows the panel). */
+  onRefresh?: () => void;
 }
 
 export interface Transport {
@@ -26,6 +28,8 @@ export interface Transport {
   /** Tell the host which segment is current so it can highlight it (VS Code). */
   setCurrent?(trailId: string, order: number | null, file?: string, range?: [number, number]): void;
   listen(events: HostEvents): () => void;
+  /** Tells the host the UI is listening (VS Code waits for this before sending commands). */
+  ready?(): void;
 }
 
 type Listener = (method: string, params: Record<string, unknown>) => void;
@@ -126,6 +130,8 @@ export class PostMessageTransport implements Transport {
       this.events.forEach((e) => e.onStartClimb?.(msg.kind, msg.since));
     } else if (msg.type === 'selectSegment') {
       this.events.forEach((e) => e.onSelectSegment?.(msg.order));
+    } else if (msg.type === 'refresh') {
+      this.events.forEach((e) => e.onRefresh?.());
     }
   }
 
@@ -153,6 +159,10 @@ export class PostMessageTransport implements Transport {
   listen(events: HostEvents) {
     this.events.add(events);
     return () => this.events.delete(events);
+  }
+
+  ready() {
+    this.api.postMessage({ type: 'ready' });
   }
 }
 

@@ -1,0 +1,13 @@
+**
+!dist/extension.js
+!media/**
+!l10n/**
+!package.json
+!package.nls.json
+!package.nls.ko.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+# Inside VS Code the UI uses the editor's own fonts; only the codicons are needed.
+media/map-view/fonts/PretendardVariable.woff2
+media/map-view/fonts/JetBrainsMono-latin-wght.woff2

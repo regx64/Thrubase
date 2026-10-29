@@ -1,0 +1,21 @@
+{
+  "description": "코드베이스를 등반하세요: 저장소의 지형도와 체크포인트가 있는 읽기 등산로를 제공하고, AI 에이전트가 방금 만든 커밋하지 않은 변경도 등반할 수 있습니다.",
+  "command.buildMap": "지형도 만들기",
+  "command.climbFull": "전체 등반 시작",
+  "command.climbDiff": "변경 등반 시작",
+  "command.climbSince": "특정 리비전 이후 변경 등반 시작…",
+  "command.setApiKey": "LLM 키 설정",
+  "command.clearApiKey": "LLM 키 삭제",
+  "command.openPanel": "지형도 열기",
+  "command.openSegment": "구간 열기",
+  "view.trail": "등산로",
+  "view.map": "지형도",
+  "welcome.trail": "진입점에서 정상까지 12–15개 구간으로 된 등산로를 따라 이 저장소를 읽습니다.\n[$(debug-start) 전체 등반 시작](command:thrubase.climbFull)\n[$(git-compare) 변경 등반 시작](command:thrubase.climbDiff)\nThrubase는 코드를 실행하지 않습니다. 가이드용 LLM 키를 추가하지 않으면 아무것도 전송하지 않습니다.",
+  "config.cliPath": "`thrubase` CLI의 경로. 비워 두면 PATH, pipx 환경 순으로 찾고, 없으면 `uvx thrubase`를 사용합니다.",
+  "config.diffSuggestThreshold": "상태 표시줄에서 변경 등반을 제안하는 변경된 함수·메서드 수.",
+  "config.llm.provider": "구간 가이드를 만들 LLM 제공자. `none`이면 모든 것이 로컬에 머뭅니다. 체크포인트는 어느 쪽이든 동작합니다.",
+  "config.llm.model": "모델 이름. 비워 두면 제공자 기본값을 사용합니다.",
+  "config.llm.endpoint": "`openai-compatible` 제공자의 엔드포인트. 예: Ollama는 `http://localhost:11434/v1`.",
+  "config.language": "Thrubase UI와 질문의 언어. `auto`는 VS Code 표시 언어를 따릅니다.",
+  "color.segmentBackground": "편집기에서 현재 등산로 구간의 배경."
+}

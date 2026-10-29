@@ -204,3 +204,8 @@ button.tb-code-number:hover { color: var(--accent-ink); text-decoration: underli
 .tb-host-vscode .tb-climb-side { display: none; }
 .tb-host-vscode .tb-climb-map { display: block; }
 @media (max-width: 640px) { .tb-host-vscode .tb-climb { grid-template-columns: 1fr; } .tb-host-vscode .tb-climb-map { display: none; } }
+
+/* VS Code sidebar map */
+.tb-mapview { min-height: 0; }
+.tb-mapview .tb-terrain { border: 0; border-radius: 0; }
+.tb-mapview .tb-empty { margin: var(--space-4) auto; padding: var(--space-4); }

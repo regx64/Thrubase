@@ -3,7 +3,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { posix } from 'node:path';
 
 export interface CliCommand {
   /** executable to spawn */
@@ -36,7 +36,8 @@ export const realEnv = (): Env => ({
 /** Finds an executable on PATH, honouring PATHEXT on Windows (thrubase.exe, .cmd, .bat). */
 export function which(name: string, e: Env): string | undefined {
   const pathVar = e.env.PATH ?? e.env.Path ?? '';
-  const sep = e.platform === 'win32' ? ';' : delimiter;
+  // Paths follow the platform described by `e`, not the host (tests describe Windows on Linux).
+  const sep = e.platform === 'win32' ? ';' : ':';
   const exts = e.platform === 'win32'
     ? (e.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean).map((x) => x.toLowerCase())
     : [''];
@@ -53,7 +54,7 @@ export function which(name: string, e: Env): string | undefined {
 /** Where pipx puts entry points: PIPX_BIN_DIR, else ~/.local/bin (also on Windows). */
 export function pipxCandidates(e: Env): string[] {
   const win = e.platform === 'win32';
-  const sepJoin = (...parts: string[]) => (win ? parts.map((p) => p.replace(/[\\/]+$/, '')).join('\\') : join(...parts));
+  const sepJoin = (...parts: string[]) => (win ? parts.map((p) => p.replace(/[\\/]+$/, '')).join('\\') : posix.join(...parts));
   const dirs = [e.env.PIPX_BIN_DIR, sepJoin(e.home, '.local', 'bin')].filter((d): d is string => !!d);
   const names = win ? ['thrubase.exe', 'thrubase.cmd'] : ['thrubase'];
   return dirs.flatMap((d) => names.map((n) => sepJoin(d, n)));

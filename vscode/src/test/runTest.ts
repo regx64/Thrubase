@@ -1,8 +1,20 @@
-import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { downloadAndUnzipVSCode, resolveCliArgsFromVSCodeExecutablePath, runTests } from '@vscode/test-electron';
+
+/** `1.131.2026090407` (installed pack) -> `1.131.0` */
+function languagePackVersion(cliArgs: string[]): string | undefined {
+  const flag = cliArgs.find((a) => a.startsWith('--extensions-dir'));
+  const dir = flag?.includes('=') ? flag.split('=')[1] : flag ? cliArgs[cliArgs.indexOf(flag) + 1] : undefined;
+  if (!dir || !existsSync(dir)) return undefined;
+  const pack = readdirSync(dir).find((d) => d.toLowerCase().startsWith('ms-ceintl.vscode-language-pack-ko-'));
+  if (!pack) return undefined;
+  const version = String(JSON.parse(readFileSync(join(dir, pack, 'package.json'), 'utf8')).version ?? '');
+  const m = /^(\d+)\.(\d+)\./.exec(version);
+  return m ? `${m[1]}.${m[2]}.0` : undefined;
+}
 
 async function main() {
   const extensionDevelopmentPath = resolve(__dirname, '../../');
@@ -24,14 +36,15 @@ async function main() {
     extensionTestsEnv: { THRUBASE_HOME: home, THRUBASE_TEST_WORKSPACE: workspace },
   });
   // V9: command names and runtime strings in a Korean VS Code (needs the Korean language pack).
-  // Language packs only apply to the VS Code minor version they were built for.
-  const koExecutable = process.env.VSCODE_KO_VERSION
-    ? await downloadAndUnzipVSCode(process.env.VSCODE_KO_VERSION)
-    : vscodeExecutablePath;
-  const [cli, ...cliArgs] = resolveCliArgsFromVSCodeExecutablePath(koExecutable);
+  const [cli, ...cliArgs] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
   const install = spawnSync(cli, [...cliArgs, '--install-extension', 'MS-CEINTL.vscode-language-pack-ko', '--force'],
     { encoding: 'utf-8', stdio: 'inherit', shell: process.platform === 'win32' });
   if (install.status !== 0) throw new Error('could not install the Korean language pack');
+  // Language packs only apply to the VS Code minor version they were built for, and the
+  // Marketplace pack can lag behind stable: run the Korean suite on the pack's version.
+  const koVersion = process.env.VSCODE_KO_VERSION ?? languagePackVersion(cliArgs);
+  console.log(`Korean run on VS Code ${koVersion ?? 'stable'}`);
+  const koExecutable = koVersion ? await downloadAndUnzipVSCode(koVersion) : vscodeExecutablePath;
   await runTests({
     vscodeExecutablePath: koExecutable,
     extensionDevelopmentPath,

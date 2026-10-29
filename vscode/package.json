@@ -5,12 +5,29 @@
   "version": "0.1.0",
   "publisher": "regx64",
   "license": "AGPL-3.0-only",
-  "repository": { "type": "git", "url": "https://github.com/regx64/thrubase" },
-  "bugs": { "url": "https://github.com/regx64/thrubase/issues" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/regx64/thrubase"
+  },
+  "bugs": {
+    "url": "https://github.com/regx64/thrubase/issues"
+  },
   "homepage": "https://github.com/regx64/thrubase#readme",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Education", "Visualization", "Other"],
-  "keywords": ["code reading", "onboarding", "call graph", "python", "code review"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Education",
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "code reading",
+    "onboarding",
+    "call graph",
+    "python",
+    "code review"
+  ],
   "l10n": "./l10n",
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -19,55 +36,163 @@
   ],
   "contributes": {
     "commands": [
-      { "command": "thrubase.buildMap", "title": "%command.buildMap%", "category": "Thrubase" },
-      { "command": "thrubase.climbFull", "title": "%command.climbFull%", "category": "Thrubase", "icon": "$(debug-start)" },
-      { "command": "thrubase.climbDiff", "title": "%command.climbDiff%", "category": "Thrubase", "icon": "$(git-compare)" },
-      { "command": "thrubase.climbSince", "title": "%command.climbSince%", "category": "Thrubase" },
-      { "command": "thrubase.setApiKey", "title": "%command.setApiKey%", "category": "Thrubase" },
-      { "command": "thrubase.clearApiKey", "title": "%command.clearApiKey%", "category": "Thrubase" },
-      { "command": "thrubase.openPanel", "title": "%command.openPanel%", "category": "Thrubase", "icon": "$(map)" },
-      { "command": "thrubase.openSegment", "title": "%command.openSegment%", "category": "Thrubase", "enablement": "false" }
+      {
+        "command": "thrubase.buildMap",
+        "title": "%command.buildMap%",
+        "category": "Thrubase"
+      },
+      {
+        "command": "thrubase.climbFull",
+        "title": "%command.climbFull%",
+        "category": "Thrubase",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "thrubase.climbDiff",
+        "title": "%command.climbDiff%",
+        "category": "Thrubase",
+        "icon": "$(git-compare)"
+      },
+      {
+        "command": "thrubase.climbSince",
+        "title": "%command.climbSince%",
+        "category": "Thrubase"
+      },
+      {
+        "command": "thrubase.setApiKey",
+        "title": "%command.setApiKey%",
+        "category": "Thrubase"
+      },
+      {
+        "command": "thrubase.clearApiKey",
+        "title": "%command.clearApiKey%",
+        "category": "Thrubase"
+      },
+      {
+        "command": "thrubase.openPanel",
+        "title": "%command.openPanel%",
+        "category": "Thrubase",
+        "icon": "$(map)"
+      },
+      {
+        "command": "thrubase.openSegment",
+        "title": "%command.openSegment%",
+        "category": "Thrubase",
+        "enablement": "false"
+      }
     ],
     "viewsContainers": {
       "activitybar": [
-        { "id": "thrubase", "title": "Thrubase", "icon": "media/activitybar.svg" }
+        {
+          "id": "thrubase",
+          "title": "Thrubase",
+          "icon": "media/activitybar.svg"
+        }
       ]
     },
     "views": {
       "thrubase": [
-        { "id": "thrubase.trail", "name": "%view.trail%", "icon": "media/activitybar.svg" },
-        { "id": "thrubase.map", "name": "%view.map%", "type": "webview", "icon": "media/activitybar.svg" }
+        {
+          "id": "thrubase.trail",
+          "name": "%view.trail%",
+          "icon": "media/activitybar.svg"
+        },
+        {
+          "id": "thrubase.map",
+          "name": "%view.map%",
+          "type": "webview",
+          "icon": "media/activitybar.svg"
+        }
       ]
     },
     "viewsWelcome": [
-      { "view": "thrubase.trail", "contents": "%welcome.trail%" }
+      {
+        "view": "thrubase.trail",
+        "contents": "%welcome.trail%"
+      }
     ],
     "menus": {
       "view/title": [
-        { "command": "thrubase.climbFull", "when": "view == thrubase.trail", "group": "navigation@1" },
-        { "command": "thrubase.climbDiff", "when": "view == thrubase.trail", "group": "navigation@2" },
-        { "command": "thrubase.openPanel", "when": "view == thrubase.trail", "group": "navigation@3" }
+        {
+          "command": "thrubase.climbFull",
+          "when": "view == thrubase.trail",
+          "group": "navigation@1"
+        },
+        {
+          "command": "thrubase.climbDiff",
+          "when": "view == thrubase.trail",
+          "group": "navigation@2"
+        },
+        {
+          "command": "thrubase.openPanel",
+          "when": "view == thrubase.trail",
+          "group": "navigation@3"
+        }
       ],
       "commandPalette": [
-        { "command": "thrubase.openSegment", "when": "false" }
+        {
+          "command": "thrubase.openSegment",
+          "when": "false"
+        }
       ]
     },
     "configuration": {
       "title": "Thrubase",
       "properties": {
-        "thrubase.cliPath": { "type": "string", "default": "", "markdownDescription": "%config.cliPath%", "scope": "machine-overridable" },
-        "thrubase.diffSuggestThreshold": { "type": "integer", "default": 5, "minimum": 1, "markdownDescription": "%config.diffSuggestThreshold%" },
-        "thrubase.llm.provider": { "type": "string", "enum": ["none", "anthropic", "openai-compatible"], "default": "none", "markdownDescription": "%config.llm.provider%" },
-        "thrubase.llm.model": { "type": "string", "default": "", "markdownDescription": "%config.llm.model%" },
-        "thrubase.llm.endpoint": { "type": "string", "default": "", "markdownDescription": "%config.llm.endpoint%" },
-        "thrubase.language": { "type": "string", "enum": ["auto", "en", "ko"], "default": "auto", "markdownDescription": "%config.language%" }
+        "thrubase.cliPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.cliPath%",
+          "scope": "machine-overridable"
+        },
+        "thrubase.diffSuggestThreshold": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 1,
+          "markdownDescription": "%config.diffSuggestThreshold%"
+        },
+        "thrubase.llm.provider": {
+          "type": "string",
+          "enum": [
+            "none",
+            "anthropic",
+            "openai-compatible"
+          ],
+          "default": "none",
+          "markdownDescription": "%config.llm.provider%"
+        },
+        "thrubase.llm.model": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.llm.model%"
+        },
+        "thrubase.llm.endpoint": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.llm.endpoint%"
+        },
+        "thrubase.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "ko"
+          ],
+          "default": "auto",
+          "markdownDescription": "%config.language%"
+        }
       }
     },
     "colors": [
       {
         "id": "thrubase.segmentBackground",
         "description": "%color.segmentBackground%",
-        "defaults": { "light": "#1e3a8a14", "dark": "#93a8f41f", "highContrast": "#93a8f433", "highContrastLight": "#1e3a8a1f" }
+        "defaults": {
+          "light": "#1e3a8a14",
+          "dark": "#93a8f41f",
+          "highContrast": "#93a8f433",
+          "highContrastLight": "#1e3a8a1f"
+        }
       }
     ]
   },
@@ -88,7 +213,7 @@
     "@types/mocha": "10.0.10",
     "@types/node": "20.17.30",
     "@types/vscode": "1.90.0",
-    "@vscode/test-electron": "2.5.2",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "3.3.2",
     "esbuild": "0.25.4",
     "mocha": "10.8.2",

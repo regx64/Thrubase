@@ -32,7 +32,8 @@ def observe(root: Path) -> dict[str, Any]:
     top = sorted((n for n in m["nodes"] if n["kind"] != "module"), key=lambda n: (-n["h"], n["id"]))[:10]
     trail = session.dispatch("trail.build", {"kind": "full"})
     return {
-        "entries": sorted(f"{nodes[e]['file']}::{nodes[e]['qualname']} ({nodes[e]['entry_kind']})" for e in m["entries"]),
+        "entries": sorted(f"{nodes[e]['file']}::{nodes[e]['qualname']} ({nodes[e]['entry_kind']})"
+                          for e in m["entries"]),
         "top10": [f"{n['file']}::{n['qualname']}" for n in top],
         "resolution_rate": round(m["stats"]["resolution_rate"], 3),
         "files": m["stats"]["files"],

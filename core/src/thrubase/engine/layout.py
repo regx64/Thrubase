@@ -19,7 +19,45 @@ SEED = 7
 _GOLDEN = math.pi * (3 - math.sqrt(5))
 
 
+DENSE_LIMIT = 400
+SAMPLE = 192
+
+
+def _spring_sampled(n: int, adj: np.ndarray, gravity: np.ndarray, seed: int) -> np.ndarray:
+    """Spring layout for many files: repulsion against a seeded random sample of nodes per
+    iteration (O(n·s)), attraction along the sparse edges."""
+    rng = np.random.default_rng(seed)
+    pos = rng.random((n, 2))
+    src, dst = np.nonzero(np.triu(adj))
+    w = adj[src, dst]
+    k = 1.0 / np.sqrt(n)
+    iterations = 60
+    temp = 0.1
+    cool = temp / (iterations + 1)
+    center = np.array([0.5, 0.5])
+    scale = n / SAMPLE
+    for _ in range(iterations):
+        sample = rng.choice(n, size=SAMPLE, replace=False)
+        delta = pos[:, None, :] - pos[sample][None, :, :]
+        dist2 = (delta**2).sum(axis=-1)
+        np.clip(dist2, 1e-4, None, out=dist2)
+        disp = (delta * (k * k / dist2)[:, :, None]).sum(axis=1) * scale
+        d = pos[src] - pos[dst]
+        dist = np.sqrt((d**2).sum(axis=1))
+        pull = d * (w * dist / k)[:, None]
+        np.add.at(disp, src, -pull)
+        np.add.at(disp, dst, pull)
+        disp += (center - pos) * gravity[:, None]
+        length = np.sqrt((disp**2).sum(axis=1))
+        np.clip(length, 0.01, None, out=length)
+        pos += disp * (np.minimum(length, temp) / length)[:, None]
+        temp -= cool
+    return pos
+
+
 def _spring(n: int, adj: np.ndarray, gravity: np.ndarray, seed: int) -> np.ndarray:
+    if n > DENSE_LIMIT:
+        return _spring_sampled(n, adj, gravity, seed)
     rng = np.random.default_rng(seed)
     pos = rng.random((n, 2))
     if n == 1:

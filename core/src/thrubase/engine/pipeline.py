@@ -9,6 +9,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import networkx as nx
+
 from .. import SCHEMA_VERSION, __version__
 from ..adapters.base import Entry, LanguageAdapter, Registry, default_registry
 from ..model import Edge, Map, Node, Repo, Stats, from_json, to_json
@@ -49,16 +51,39 @@ class CancelToken:
             raise Cancelled()
 
 
-@dataclass
 class Analysis:
-    """Everything build_map produced, kept in memory for trails and diffs."""
+    """Everything build_map produced, kept in memory for trails and diffs. Parsed files, the
+    symbol index and the graph are built on first use, so a cached Map loads fast."""
 
-    map: Map
-    files: list[ParsedFile]
-    index: SymbolIndex
-    edges: list[Edge]
-    graph: object
-    root: Path
+    def __init__(self, map: Map, root: Path, edges: list[Edge], *,
+                 files: list[ParsedFile] | Callable[[], list[ParsedFile]],
+                 index: SymbolIndex | None = None, graph: nx.DiGraph | None = None) -> None:
+        self.map = map
+        self.root = root
+        self.edges = edges
+        self._files = files if isinstance(files, list) else None
+        self._load_files = None if isinstance(files, list) else files
+        self._index = index
+        self._graph = graph
+
+    @property
+    def files(self) -> list[ParsedFile]:
+        if self._files is None:
+            assert self._load_files is not None
+            self._files = self._load_files()
+        return self._files
+
+    @property
+    def index(self) -> SymbolIndex:
+        if self._index is None:
+            self._index = SymbolIndex(self.files)
+        return self._index
+
+    @property
+    def graph(self) -> nx.DiGraph:
+        if self._graph is None:
+            self._graph = gr.build_graph(self.map.nodes, self.edges)
+        return self._graph
 
 
 def _noop(stage: str, done: int, total: int) -> None:
@@ -154,22 +179,25 @@ class Engine:
         if self._analysis is not None and self._analysis.map.repo.snapshot == snapshot and not no_cache:
             return self._analysis
 
-        if not no_cache:
-            self._load_disk_cache()
-
-        all_paths = frozenset(collected.paths)
-        files: list[ParsedFile] = []
-        adapters_of: dict[str, LanguageAdapter] = {}
-        keys: list[str] = []
-        for i, (path, adapter) in enumerate(collected.files):
-            module = adapter.module_name(path, all_paths)
-            pf = self.parse_source(adapter, path, sources[path], module)
-            keys.append(self._cache_key(adapter, pf.content_hash, path, module))
-            files.append(pf)
-            adapters_of[path] = adapter
-            if i % 25 == 0 or i == total - 1:
-                on_progress("parse", i + 1, total)
-                cancel.check()
+        def parse_all(progress: ProgressFn = _noop, token: CancelToken | None = None
+                      ) -> tuple[list[ParsedFile], list[str], dict[str, LanguageAdapter]]:
+            if not no_cache:
+                self._load_disk_cache()
+            all_paths = frozenset(collected.paths)
+            files: list[ParsedFile] = []
+            adapters_of: dict[str, LanguageAdapter] = {}
+            keys: list[str] = []
+            for i, (path, adapter) in enumerate(collected.files):
+                module = adapter.module_name(path, all_paths)
+                pf = self.parse_source(adapter, path, sources[path], module)
+                keys.append(self._cache_key(adapter, pf.content_hash, path, module))
+                files.append(pf)
+                adapters_of[path] = adapter
+                if i % 25 == 0 or i == total - 1:
+                    progress("parse", i + 1, total)
+                    if token is not None:
+                        token.check()
+            return files, keys, adapters_of
 
         cached_map = None if no_cache else self.store.load_map(self.root, snapshot)
         m_cached: Map | None = None
@@ -179,12 +207,11 @@ class Engine:
             except (KeyError, TypeError, ValueError):
                 m_cached = None
         if m_cached is not None:
-            m = m_cached
-            index = SymbolIndex(files)
-            g = gr.build_graph(m.nodes, m.edges)
-            self._analysis = Analysis(map=m, files=files, index=index, edges=m.edges, graph=g, root=self.root)
+            self._analysis = Analysis(m_cached, self.root, m_cached.edges, files=lambda: parse_all()[0])
             on_progress("done", 1, 1)
             return self._analysis
+
+        files, keys, adapters_of = parse_all(on_progress, cancel)
 
         on_progress("resolve", 0, 1)
         index = SymbolIndex(files)
@@ -252,7 +279,7 @@ class Engine:
                 stats=stats, weights=dict(cfg.weights), library=library)
         self.store.save_map(self.root, snapshot, to_json(m))
         self._save_disk_cache(keys)
-        self._analysis = Analysis(map=m, files=files, index=index, edges=edges, graph=g, root=self.root)
+        self._analysis = Analysis(m, self.root, edges, files=files, index=index, graph=g)
         on_progress("done", 1, 1)
         return self._analysis
 

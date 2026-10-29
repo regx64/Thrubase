@@ -27,6 +27,9 @@
   function: (_) @call.callee
   arguments: (_) @call.args) @call
 
+; ---- comments (left out of body hashes) ------------------------------------
+(comment) @comment
+
 ; ---- meaningful spots (locate checkpoints) ----------------------------------
 (raise_statement) @spot.raise
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import bisect
 import hashlib
+import re
 from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -18,7 +20,6 @@ if TYPE_CHECKING:
     from ...model import Edge
 
 _DEF_TYPES = ("function_definition", "class_definition")
-_HASH_SKIP = frozenset({"comment"})
 
 
 def _text(node: ts.Node | None) -> str:
@@ -84,32 +85,36 @@ def _enclosing_def(node: ts.Node) -> ts.Node | None:
 _LITERALS = frozenset({"string", "concatenated_string", "list", "dictionary", "set", "tuple", "integer",
                        "float", "list_comprehension", "dictionary_comprehension", "set_comprehension",
                        "generator_expression", "true", "false", "none", "parenthesized_expression"})
-_IMPORTS = frozenset({"import_statement", "import_from_statement", "future_import_statement"})
 
 
-def _tokens(node: ts.Node, skip_nested: bool = True, skip: frozenset[str] = frozenset()) -> list[str]:
-    """Leaf tokens of a definition, without comments and without nested definitions."""
-    out: list[str] = []
-    stack = [node]
-    root = node
-    while stack:
-        n = stack.pop()
-        if n.type in _HASH_SKIP or n.type in skip:
+_WS = re.compile(rb"\s+")
+
+
+def _outer(node: ts.Node) -> ts.Node:
+    """A definition including its decorators."""
+    p = node.parent
+    return p if p is not None and p.type == "decorated_definition" else node
+
+
+def _hash_without(source: bytes, start: int, end: int, holes: list[tuple[int, int]]) -> str:
+    """sha1 of ``source[start:end]`` minus the ``holes`` (comments, nested definitions) and all
+    whitespace, so comment and formatting changes do not count as code changes."""
+    h = hashlib.sha1()
+    pos = start
+    for a, b in sorted(holes):
+        if b <= pos or a >= end:
             continue
-        if skip_nested and n is not root and n.type in _DEF_TYPES:
-            continue
-        if n.type == "decorated_definition" and skip_nested and n is not root:
-            continue
-        if n.child_count == 0 or n.type == "string":
-            out.append(_text(n))
-            continue
-        stack.extend(reversed(n.children))
-    return out
+        if a > pos:
+            h.update(_WS.sub(b"", source[pos:a]))
+        pos = max(pos, b)
+    if pos < end:
+        h.update(_WS.sub(b"", source[pos:end]))
+    return h.hexdigest()[:16]
 
 
 class PythonAdapter:
     name = "python"
-    version = "py-6"
+    version = "py-7"
     extensions: tuple[str, ...] = (".py",)
     excludes: tuple[str, ...] = (
         ".git/",
@@ -199,9 +204,9 @@ class PythonAdapter:
 
         seen_defs: set[str] = set()
         defs_by_node: dict[int, int] = {}
-        # Imports are left out so files where only import lines changed do not count as changed.
-        module_tokens: list[str] = _tokens(tree.root_node, skip=_IMPORTS)
-        pf.extra["module_hash"] = hashlib.sha1(" ".join(module_tokens).encode()).hexdigest()[:16]
+        def_nodes: list[tuple[int, ts.Node, ts.Node | None]] = []  # (definition index, node, parent def)
+        comments: list[tuple[int, int]] = []
+        imports: list[tuple[int, int]] = []
 
         for _, caps in matches:
             if "def.function" in caps or "def.class" in caps:
@@ -230,9 +235,7 @@ class PythonAdapter:
                     for arg in caps["def.bases"][0].named_children:
                         if arg.type in ("identifier", "attribute"):
                             bases.append(_compact(_text(arg)))
-                toks = _tokens(node)
                 name = _text(node.child_by_field_name("name"))
-                body_toks = [t for t in toks if t != name]
                 params: dict[str, str] = {}
                 if "def.params" in caps:
                     for prm in caps["def.params"][0].named_children:
@@ -245,12 +248,11 @@ class PythonAdapter:
                                 params[_text(pname)] = ptype
                 returns = _type_name(caps["def.returns"][0]) if "def.returns" in caps else ""
                 defs_by_node[node.id] = len(pf.definitions)
+                def_nodes.append((len(pf.definitions), node, parent_node))
                 pf.definitions.append(Definition(
                     qualname=q, name=name, kind=kind,  # type: ignore[arg-type]
                     start_line=_line(node), end_line=_end_line(node), parent=parent,
                     bases=bases, decorators=decorators,
-                    body_hash=hashlib.sha1(" ".join(toks).encode()).hexdigest()[:16],
-                    tokens=body_toks,
                     is_async=any(c.type == "async" for c in node.children),
                     params=params, returns=returns,
                 ))
@@ -270,8 +272,8 @@ class PythonAdapter:
                         # `self.bus = bus` takes the annotation of the parameter it came from
                         owner_fn = _enclosing_def(caps["bind"][0])
                         if owner_fn is not None and owner_fn.id in defs_by_node:
-                            ptype = pf.definitions[defs_by_node[owner_fn.id]].params.get(_text(right))
-                            value = f"ann:{ptype}" if ptype else ""
+                            ptype_text = pf.definitions[defs_by_node[owner_fn.id]].params.get(_text(right))
+                            value = f"ann:{ptype_text}" if ptype_text else ""
                     elif right.type == "await":
                         inner = right.named_children[0] if right.named_children else None
                         if inner is not None and inner.type == "call":
@@ -294,8 +296,13 @@ class PythonAdapter:
                         if cls_node is not None and cls_node.id in defs_by_node:
                             attr_name = _text(left.child_by_field_name("attribute"))
                             pf.definitions[defs_by_node[cls_node.id]].attrs.setdefault(attr_name, value)
+            elif "comment" in caps:
+                c = caps["comment"][0]
+                comments.append((c.start_byte, c.end_byte))
             elif "import" in caps:
                 node = caps["import"][0]
+                if node.parent is not None and node.parent.type == "module":
+                    imports.append((node.start_byte, node.end_byte))
                 scope = function_scope_of(node)
                 for ch in node.named_children:
                     if ch.type == "dotted_name":
@@ -307,6 +314,8 @@ class PythonAdapter:
                             line=_line(node), scope=scope, alias=_text(ch.child_by_field_name("alias"))))
             elif "import.from" in caps:
                 node = caps["import.from"][0]
+                if node.parent is not None and node.parent.type == "module":
+                    imports.append((node.start_byte, node.end_byte))
                 scope = function_scope_of(node)
                 mod_node = node.child_by_field_name("module_name")
                 level = 0
@@ -393,6 +402,22 @@ class PythonAdapter:
                 if name == "urlpatterns" and rhs.type in ("list", "binary_operator"):
                     pf.extra["urlpatterns"] = _url_refs(rhs)
 
+        # Body hashes: each definition without comments and without its nested definitions; the
+        # module without definitions, comments and imports (import-only edits are not changes).
+        comments.sort()
+        starts = [c[0] for c in comments]
+        children: dict[int | None, list[tuple[int, int]]] = {}
+        for _, def_node, owner_node in def_nodes:
+            o = _outer(def_node)
+            key = owner_node.id if owner_node is not None else None
+            children.setdefault(key, []).append((o.start_byte, o.end_byte))
+        for i, node, _ in def_nodes:
+            lo = bisect.bisect_left(starts, node.start_byte)
+            hi = bisect.bisect_left(starts, node.end_byte)
+            holes = comments[lo:hi] + children.get(node.id, [])
+            pf.definitions[i].body_hash = _hash_without(source, node.start_byte, node.end_byte, holes)
+        pf.extra["module_hash"] = _hash_without(source, 0, len(source),
+                                                comments + children.get(None, []) + imports)
         pf.definitions.sort(key=lambda d: (d.start_line, d.qualname))
         pf.calls.sort(key=lambda c: (c.line, c.col))
         pf.refs.sort(key=lambda c: (c.line, c.col))

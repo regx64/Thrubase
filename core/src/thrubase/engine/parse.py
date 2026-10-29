@@ -31,7 +31,6 @@ class Definition:
     bases: list[str] = field(default_factory=list)
     decorators: list[str] = field(default_factory=list)
     body_hash: str = ""
-    tokens: list[str] = field(default_factory=list)
     is_async: bool = False
     #: parameter name -> annotation text (functions)
     params: dict[str, str] = field(default_factory=dict)
@@ -151,13 +150,16 @@ def _count_errors(root: ts.Node) -> int:
 
 
 def parsed_to_json(pf: ParsedFile) -> dict[str, Any]:
-    """Compact JSON for the on-disk parse cache (rename tokens are not kept)."""
-    from dataclasses import asdict
-
-    d = asdict(pf)
-    for definition in d["definitions"]:
-        definition.pop("tokens", None)
-    return d
+    """Plain JSON for the on-disk parse cache (``dataclasses.asdict`` is far slower)."""
+    return {
+        "path": pf.path, "module": pf.module, "content_hash": pf.content_hash, "line_count": pf.line_count,
+        "definitions": [dict(d.__dict__) for d in pf.definitions],
+        "imports": [dict(i.__dict__) for i in pf.imports],
+        "calls": [dict(c.__dict__) for c in pf.calls],
+        "refs": [dict(c.__dict__) for c in pf.refs],
+        "spots": [dict(s.__dict__) for s in pf.spots],
+        "assignments": pf.assignments, "extra": pf.extra, "errors": pf.errors,
+    }
 
 
 def parsed_from_json(d: dict[str, Any]) -> ParsedFile:

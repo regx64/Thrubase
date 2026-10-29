@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 import difflib
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -140,7 +141,7 @@ def _relevant(engine: Engine, changes: list[Change]) -> list[Change]:
 
 
 def _base_files(engine: Engine, current: list[ParsedFile], base: str | None,
-                changes: list[Change]) -> tuple[list[ParsedFile], dict[str, ParsedFile]]:
+                changes: list[Change]) -> tuple[list[ParsedFile], dict[str, ParsedFile], dict[str, bytes]]:
     """Base revision files: unchanged files are reused, changed ones are parsed from git."""
     files = {pf.path: pf for pf in current}
     base_sources: dict[str, bytes] = {}
@@ -171,7 +172,7 @@ def _base_files(engine: Engine, current: list[ParsedFile], base: str | None,
         pf = engine.parser.parse(adapter, path, src, adapter.module_name(path, all_paths))
         parsed[path] = pf
         out.append(pf)
-    return sorted(out, key=lambda f: f.path), parsed
+    return sorted(out, key=lambda f: f.path), parsed, base_sources
 
 
 def _similar(a: list[str], b: list[str]) -> float:
@@ -191,7 +192,7 @@ def graph_diff(engine: Engine, analysis: Analysis, since: str | None = None) -> 
     base, changes = detect_changes(engine.root, since)
     changes = _relevant(engine, changes)
     changed_paths = {c.path for c in changes} | {c.old_path for c in changes if c.old_path}
-    base_files, fresh_base = _base_files(engine, analysis.files, base, changes)
+    base_files, fresh_base, base_sources = _base_files(engine, analysis.files, base, changes)
 
     index = SymbolIndex(base_files)
     by_adapter: dict[str, list[ParsedFile]] = {}
@@ -223,8 +224,13 @@ def graph_diff(engine: Engine, analysis: Analysis, since: str | None = None) -> 
     # Rename detection by body token similarity.
     renamed: dict[str, str] = {}
     if added and removed:
-        tokens_new = _tokens_for(engine, analysis, {cur[n].file for n in added})
-        tokens_old = {f"{pf.path}::{d.qualname}": d.tokens for pf in fresh_base.values() for d in pf.definitions}
+        tokens_new: dict[str, list[str]] = {}
+        for pf in analysis.files:
+            if pf.path in {cur[n].file for n in added}:
+                tokens_new.update(_def_tokens(pf, (engine.root / pf.path).read_bytes()))
+        tokens_old: dict[str, list[str]] = {}
+        for pf in fresh_base.values():
+            tokens_old.update(_def_tokens(pf, base_sources[pf.path]))
         for r in removed:
             if old[r].kind == "module":
                 continue
@@ -280,19 +286,16 @@ def graph_diff(engine: Engine, analysis: Analysis, since: str | None = None) -> 
     return DiffResult(diff=diff, base_callers=base_callers, changes=changes)
 
 
-def _tokens_for(engine: Engine, analysis: Analysis, paths: set[str]) -> dict[str, list[str]]:
+_TOKEN = re.compile(r"\w+|[^\w\s]")
+
+
+def _def_tokens(pf: ParsedFile, source: bytes) -> dict[str, list[str]]:
+    """Body tokens per definition (name line left out), for rename similarity."""
+    lines = source.replace(b"\r\n", b"\n").decode("utf-8", "replace").split("\n")
     out: dict[str, list[str]] = {}
-    for pf in analysis.files:
-        if pf.path not in paths:
-            continue
-        defs = pf.definitions
-        if defs and not any(d.tokens for d in defs):
-            adapter = engine.registry.for_path(pf.path)
-            assert adapter is not None
-            src = (engine.root / pf.path).read_bytes()
-            defs = engine.parser.parse(adapter, pf.path, src, pf.module).definitions
-        for d in defs:
-            out[f"{pf.path}::{d.qualname}"] = d.tokens
+    for d in pf.definitions:
+        body = [ln.split("#", 1)[0] for ln in lines[d.start_line : d.end_line]]
+        out[f"{pf.path}::{d.qualname}"] = _TOKEN.findall("\n".join(body))
     return out
 
 

@@ -8,6 +8,7 @@ languages can validate what core sends.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import json
 import types
 import typing
@@ -239,16 +240,28 @@ class Progress:
 T = TypeVar("T")
 
 
+_PLAIN = (str, int, float, bool, type(None))
+
+
 def to_json(obj: Any) -> Any:
+    if isinstance(obj, _PLAIN):
+        return obj
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-        return {f.name: to_json(getattr(obj, f.name)) for f in dataclasses.fields(obj)}
+        return {name: (v if isinstance(v, _PLAIN) else to_json(v))
+                for name in _field_names(type(obj)) for v in (getattr(obj, name),)}
     if isinstance(obj, dict):
-        return {str(k): to_json(v) for k, v in obj.items()}
+        return {str(k): (v if isinstance(v, _PLAIN) else to_json(v)) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [to_json(v) for v in obj]
+        return [v if isinstance(v, _PLAIN) else to_json(v) for v in obj]
     return obj
 
 
+@functools.cache
+def _field_names(cls: type) -> tuple[str, ...]:
+    return tuple(f.name for f in dataclasses.fields(cls))
+
+
+@functools.cache
 def _hints(cls: type) -> dict[str, Any]:
     return get_type_hints(cls, globalns=globals())
 
@@ -283,12 +296,29 @@ def _convert(tp: Any, value: Any) -> Any:
     return value
 
 
+@functools.cache
+def _plain_fields(cls: type) -> bool:
+    """True when every field is a str/int/float/bool (or optional/literal of them): such
+    records (Node, Edge) are built straight from the dict."""
+    def plain(tp: Any) -> bool:
+        if tp in (str, int, float, bool, type(None)):
+            return True
+        if _is_union(tp):
+            return all(plain(a) for a in get_args(tp))
+        return get_origin(tp) is Literal
+    return all(plain(tp) for tp in _hints(cls).values())
+
+
 def from_json(cls: type[T], data: dict[str, Any]) -> T:
-    hints = _hints(cls)
+    key: Any = cls
+    if _plain_fields(key):
+        names = _field_names(key)
+        return cls(**{k: v for k, v in data.items() if k in names})
+    hints = _hints(key)
     kwargs: dict[str, Any] = {}
-    for f in dataclasses.fields(cls):  # type: ignore[arg-type]
-        if f.name in data:
-            kwargs[f.name] = _convert(hints[f.name], data[f.name])
+    for name in _field_names(key):
+        if name in data:
+            kwargs[name] = _convert(hints[name], data[name])
     return cls(**kwargs)
 
 

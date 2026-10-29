@@ -17,7 +17,7 @@ export function Summit({ review, onOpen, onAgain, onMap }: SummitProps) {
     <section className="tb-card tb-summit" aria-labelledby="tb-summit-title">
       <header className="tb-summit-header">
         <Icon name="check" large className="tb-status-passed" />
-        <h2 id="tb-summit-title" className="tb-title">{t('summit.title')}</h2>
+        <h2 id="tb-summit-title" className="tb-heading">{t('summit.title')}</h2>
       </header>
       {review.length === 0 ? (
         <p className="tb-body">{t('summit.none')}</p>

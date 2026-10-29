@@ -43,8 +43,9 @@ export class EditorBridge implements vscode.Disposable {
   relative(uri: vscode.Uri): string | undefined {
     const root = this.root();
     if (!root) return undefined;
-    const rel = vscode.workspace.asRelativePath(uri, false).replace(/\\/g, '/');
-    return rel === uri.fsPath ? undefined : rel;
+    const rel = vscode.workspace.asRelativePath(uri, false);
+    // asRelativePath hands back the full path for files outside the workspace.
+    return rel === uri.fsPath ? undefined : rel.replace(/\\/g, '/');
   }
 
   async open(file: string, line: number, endLine?: number, preserveFocus = true): Promise<void> {

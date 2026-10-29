@@ -143,7 +143,7 @@ h1, h2, h3, p { margin: 0; }
 .tb-trailrow-detour .tb-trailrow-button { padding-left: calc(var(--space-2) + var(--space-4)); }
 .tb-trailrow-number { width: 18px; text-align: right; font: var(--type-caption); color: var(--ink-muted); flex: none; }
 .tb-trailrow-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.tb-trailrow-file { flex: 0 1 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font: var(--type-caption); color: var(--ink-muted); }
+.tb-trailrow-file { flex: 0 0 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font: var(--type-caption); color: var(--ink-muted); }
 .tb-trailrow-changed { color: var(--ink-muted); }
 
 /* cards */

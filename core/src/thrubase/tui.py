@@ -43,8 +43,9 @@ class Climb:
         self.console.print(Text(self._t("climb.header", kind=kind_label, name=root_name, count=len(main)),
                                 style="bold"))
         started = [s for s in segments if self._status(progress, s) != "todo"]
-        if started and progress.get("current"):
-            self.console.print(self._t("climb.resume", order=progress["current"]))
+        if started and progress.get("current") in [s["order"] for s in main]:
+            at = [s["order"] for s in main].index(progress["current"]) + 1
+            self.console.print(self._t("climb.resume", order=at))
         try:
             for seg in segments:
                 if self._status(progress, seg) != "todo":

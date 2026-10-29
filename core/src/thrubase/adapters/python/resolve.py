@@ -231,7 +231,7 @@ class Resolver:
         self._mro[class_id] = ([class_id], False)  # recursion guard for cyclic bases
         chain = [class_id]
         external = False
-        path, qual = class_id.rsplit("::", 1)
+        path = class_id.rsplit("::", 1)[0]
         d = self.index.definition(class_id)
         if d is not None:
             for base in d.bases:
@@ -278,6 +278,22 @@ class Resolver:
                 return None
             m, external = self.member(cls, callee.split(".", 1)[1], skip_self=True)
             return Target("node", m) if m else (EXTERNAL if external else None)
+        if "()." in callee:
+            head, _, member = callee.rpartition("().")
+            made = self.callee(pf, caller, head)
+            if made is not None and made.kind == "node":
+                kind = self._kinds.get(made.ref)
+                if kind == "class":
+                    made = Target("instance", made.ref)
+                elif kind in ("function", "method"):
+                    d = self.index.definition(made.ref)
+                    made = (self._typed(made.ref.rsplit("::", 1)[0], d.parent, f"ann:{d.returns}", 0)
+                            if d is not None and d.returns else None)
+                else:
+                    made = None
+            elif made is not None and made.kind != "external":
+                made = None
+            return self.attr(made, member) if made is not None else None
         parts = callee.split(".")
         if callee == "cls" and caller is not None:
             cls = self._enclosing_class(pf.path, caller)

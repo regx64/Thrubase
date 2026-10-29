@@ -1,0 +1,57 @@
+{
+  "entries": [
+    "tasknest/__main__.py::<module> (main-module)",
+    "tasknest/api/projects.py::archive_project (route)",
+    "tasknest/api/projects.py::create_project (route)",
+    "tasknest/api/projects.py::list_projects (route)",
+    "tasknest/api/reports.py::burndown (route)",
+    "tasknest/api/reports.py::weekly (route)",
+    "tasknest/api/tasks.py::add_label (route)",
+    "tasknest/api/tasks.py::assign_task (route)",
+    "tasknest/api/tasks.py::complete_task (route)",
+    "tasknest/api/tasks.py::create_task (route)",
+    "tasknest/api/tasks.py::delete_task (route)",
+    "tasknest/api/tasks.py::list_tasks (route)",
+    "tasknest/api/users.py::login (route)",
+    "tasknest/api/users.py::me (route)",
+    "tasknest/api/users.py::register (route)",
+    "tasknest/cli.py::migrate (cli)",
+    "tasknest/cli.py::report (cli)",
+    "tasknest/cli.py::serve (cli)",
+    "tasknest/cli.py::worker (cli)"
+  ],
+  "top10": [
+    "tasknest/api/deps.py::get_current_user",
+    "tasknest/db/session.py::Database.execute",
+    "tasknest/cli.py::worker",
+    "tasknest/workers/scheduler.py::Scheduler.__init__",
+    "tasknest/workers/scheduler.py::Scheduler.register_defaults",
+    "tasknest/db/session.py::Database.connect",
+    "tasknest/workers/reminders.py::send_due_reminders",
+    "tasknest/services/reports.py::ReportService.weekly_summary",
+    "tasknest/config.py::load_settings",
+    "tasknest/app.py::create_app"
+  ],
+  "resolution_rate": 0.953,
+  "files": 48,
+  "trail": [
+    "list_projects",
+    "get_current_user",
+    "weekly",
+    "ReportService.weekly_summary",
+    "migrate",
+    "run_migrations",
+    "Database.execute",
+    "Database.transaction",
+    "Database.connect",
+    "worker",
+    "Scheduler.__init__",
+    "Scheduler.register_defaults",
+    "Scheduler.reminders",
+    "send_due_reminders"
+  ],
+  "checkpoints_per_segment": [
+    1
+  ],
+  "review": "Implementer pre-review 2026-10-29 (gate 1 still needs a human sign-off): all FastAPI routes and typer commands are detected. Top 10 is auth dependency, DB access, scheduler and reports. The uncommitted changes (labels, slugify -> make_slug rename, normalize_name dropped, EventBus.publish moved) produce added- and removed-edge questions in the diff climb."
+}

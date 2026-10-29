@@ -40,7 +40,7 @@ def resolve_lang(lang: str | None) -> str:
     return "ko" if loc.lower().startswith("ko") else "en"
 
 
-def render(lang: str, key: str, params: dict[str, Any] | None = None) -> str:
+def render(lang: str, key: str, params: dict[str, Any] | None = None, /) -> str:
     template = messages(lang).get(key) or messages("en").get(key) or key
     try:
         return template.format(**(params or {}))
@@ -48,5 +48,5 @@ def render(lang: str, key: str, params: dict[str, Any] | None = None) -> str:
         return template
 
 
-def t(lang: str, key: str, **params: Any) -> str:
+def t(lang: str, key: str, /, **params: Any) -> str:
     return render(lang, key, params)

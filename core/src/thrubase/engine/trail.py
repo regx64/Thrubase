@@ -86,7 +86,12 @@ def _dfs_order(gc: nx.DiGraph, keep: set[str], starts: Iterable[str], index: dic
             seen.add(cur)
             order.append(cur)
             nxt = [n for n in gr.ordered_successors(gc, cur) if n in keep] if cur in gc else []
-            nxt += sorted(children.get(cur, []), key=lambda n: index[n].start_line)
+            # Members reached through their class: start with the ones no sibling calls
+            # (``__call__`` before ``wsgi_app``), so the calls between them set the order.
+            members = children.get(cur, [])
+            member_set = set(members)
+            nxt += sorted(members, key=lambda n: (
+                any(p in member_set for p in (gc.predecessors(n) if n in gc else [])), index[n].start_line))
             stack.extend(reversed([n for n in nxt if n not in seen]))
 
     for s in starts:
@@ -213,6 +218,13 @@ def diff_trail(m: Map, g: nx.DiGraph, files: dict[str, ParsedFile], diff: GraphD
     gc = call_graph(g)
     parent_of = _parent_map(m)
     touched = [n for n in diff.touched if n in index]
+    # A class whose methods changed is read through those methods; a module node only matters
+    # when its module-level calls changed.
+    touched_parents = {n.rpartition(".")[0] for n in touched if "." in n.rpartition("::")[2]}
+    moved = {e.src for e in [*diff.added_edges, *diff.removed_edges]}
+    touched = [n for n in touched
+               if not (index[n].kind == "class" and n in touched_parents)
+               and not (index[n].kind == "module" and n not in moved)]
     lost_callers = [e.src for e in diff.removed_edges if e.src in index]
     core = list(dict.fromkeys([*touched, *lost_callers]))
     if not core and not diff.removed_nodes:

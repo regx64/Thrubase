@@ -26,7 +26,7 @@ from ..base import Entry
 if sys.version_info >= (3, 11):
     import tomllib
 else:  # pragma: no cover
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore[import-not-found,unused-ignore]
 
 _ROUTE_METHODS = "route|get|post|put|delete|patch|head|options|websocket|api_route|trace"
 _ROUTE = re.compile(rf"^([A-Za-z_][\w.]*)\.({_ROUTE_METHODS})\(")
@@ -113,14 +113,14 @@ def detect_entries(files: list[ParsedFile], index: SymbolIndex, root: Path, edge
                     obj = m.group(1)
                     assigned = pf.assignments.get(obj, "")
                     if obj in group_functions or any(assigned.endswith(f) for f in _CLI_FACTORIES) \
-                            or obj in ("cli", "app") and "typer" in assigned.lower():
+                            or (obj in ("cli", "app") and "typer" in assigned.lower()):
                         add(nid, "cli", dec)
                         break
         # 5. Django urlpatterns
         for ref, _line in pf.extra.get("urlpatterns", []):
-            t = resolver.expr(pf.path, None, str(ref))
-            if t is not None and t.kind == "node":
-                add(t.ref, "django-url", str(ref))
+            target = resolver.expr(pf.path, None, str(ref))
+            if target is not None and target.kind == "node":
+                add(target.ref, "django-url", str(ref))
 
     if found:
         return list(found.values())

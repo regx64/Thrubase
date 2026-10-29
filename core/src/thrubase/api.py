@@ -10,7 +10,7 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from . import SCHEMA_VERSION, __version__
 from .engine import checkpoint as cpmod
@@ -44,6 +44,10 @@ REQUEST_CANCELLED = -32800
 INTERNAL_ERROR = -32603
 
 CODE_CONTEXT = 3
+
+
+_FINISHED: dict[str, Literal["passed", "revealed", "skipped"]] = {
+    "passed": "passed", "weak": "revealed", "skipped": "skipped"}
 
 
 class ApiError(Exception):
@@ -122,7 +126,7 @@ class Session:
         except GitMissing as exc:
             raise ApiError(NOT_A_GIT_REPOSITORY, render(self.lang, "cli.error.no_git")) from exc
         except BadRevision as exc:
-            raise ApiError(INVALID_PARAMS, render(self.lang, "cli.error.bad_ref", ref=str(exc))) from exc
+            raise ApiError(INVALID_PARAMS, render(self.lang, "cli.error.bad_ref", {"ref": str(exc)})) from exc
         except trailmod.NoChanges as exc:
             raise ApiError(NO_CHANGES, render(self.lang, "cli.error.no_changes")) from exc
         except GitError as exc:
@@ -137,6 +141,10 @@ class Session:
         with self._lock:
             return self.engine.analyze(no_cache=no_cache, on_progress=progress, cancel=cancel)
 
+    def _public(self, value: Any) -> dict[str, Any]:
+        out: dict[str, Any] = to_json(value)
+        return out
+
     # ------------------------------------------------------------------ trails & progress
     def _save_trail(self, trail: Trail) -> None:
         assert self.root is not None
@@ -144,10 +152,10 @@ class Session:
         self._trails[trail.id] = trail
 
         def set_current(cur: Any) -> dict[str, Any]:
-            cur = cur if isinstance(cur, dict) else {}
-            cur[trail.kind] = trail.id
-            cur["last"] = trail.id
-            return cur
+            current: dict[str, Any] = cur if isinstance(cur, dict) else {}
+            current[trail.kind] = trail.id
+            current["last"] = trail.id
+            return current
 
         self.store.update_json(self.store.current_path(self.root), set_current)
 
@@ -188,7 +196,7 @@ class Session:
                 # A segment keeps a finished status even if a question changed with the code.
                 for st in sp.checkpoints.values():
                     if st.state == "idle":
-                        st.state = {"passed": "passed", "weak": "revealed", "skipped": "skipped"}[sp.status]
+                        st.state = _FINISHED[sp.status]
             sp.status = _segment_status(sp.checkpoints)  # type: ignore[assignment]
             segments[s.key] = sp
         prog = Progress(trail_id=trail.id, kind=trail.kind, segments=segments, current=None, updated=prog.updated)
@@ -421,7 +429,7 @@ class Session:
                 if st.state not in ("passed", "revealed"):
                     st.state = "skipped"
 
-        return to_json(self._write_progress(trail, apply))  # type: ignore[no-any-return]
+        return self._public(self._write_progress(trail, apply))
 
     def diff_count(self, p: dict[str, Any], cancel: CancelToken) -> dict[str, Any]:
         with self._lock:
@@ -437,7 +445,7 @@ class Session:
                 sp.status = "todo"
                 sp.checkpoints = {k: CheckpointState() for k in sp.checkpoints}
 
-        return to_json(self._write_progress(trail, apply))  # type: ignore[no-any-return]
+        return self._public(self._write_progress(trail, apply))
 
     def config_get(self, p: dict[str, Any], cancel: CancelToken) -> dict[str, Any]:
         return {"lang": self.lang, "provider": self.config.llm_provider, "model": self.config.llm_model,

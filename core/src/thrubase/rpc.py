@@ -17,7 +17,7 @@ import traceback
 from typing import IO, Any
 
 from .api import INTERNAL_ERROR, REQUEST_CANCELLED, ApiError, Session
-from .engine.pipeline import CancelToken, Cancelled
+from .engine.pipeline import Cancelled, CancelToken
 
 PARSE_ERROR = -32700
 INVALID_REQUEST = -32600

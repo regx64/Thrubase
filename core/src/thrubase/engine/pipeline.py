@@ -22,7 +22,7 @@ from .parse import ParsedFile, Parser, content_hash, normalize_source, parsed_fr
 
 ProgressFn = Callable[[str, int, int], None]
 #: bumped whenever graph, altitude or layout output changes, invalidating cached maps
-ENGINE_VERSION = "3"
+ENGINE_VERSION = "4"
 
 
 class Cancelled(Exception):
@@ -181,9 +181,8 @@ class Engine:
         if m_cached is not None:
             m = m_cached
             index = SymbolIndex(files)
-            edges = m.edges
-            g = gr.build_graph(m.nodes, edges)
-            self._analysis = Analysis(map=m, files=files, index=index, edges=edges, graph=g, root=self.root)
+            g = gr.build_graph(m.nodes, m.edges)
+            self._analysis = Analysis(map=m, files=files, index=index, edges=m.edges, graph=g, root=self.root)
             on_progress("done", 1, 1)
             return self._analysis
 

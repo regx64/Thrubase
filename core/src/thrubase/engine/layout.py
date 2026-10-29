@@ -61,8 +61,9 @@ def layout(nodes: list[Node], edges: list[Edge], seed: int = SEED) -> dict[str, 
         if a != b:
             adj[a, b] += 1
             adj[b, a] += 1
-    if adj.max() > 0:
-        adj = np.log1p(adj) / np.log1p(adj.max())
+    top = float(np.max(adj)) if adj.size else 0.0
+    if top > 0:
+        adj = np.log1p(adj) / np.log1p(top)
     file_h = np.array([max((n.h for n in by_file[f]), default=0.0) for f in files])
     gravity = 0.02 + 0.6 * file_h**2
     centers = _spring(nf, adj, gravity, seed)
@@ -84,7 +85,7 @@ def layout(nodes: list[Node], edges: list[Edge], seed: int = SEED) -> dict[str, 
                 x, y = cx, cy
             else:
                 r = radius * math.sqrt(i / max(len(members) - 1, 1))
-                a = i * _GOLDEN
-                x, y = cx + r * math.cos(a), cy + r * math.sin(a)
+                angle = i * _GOLDEN
+                x, y = cx + r * math.cos(angle), cy + r * math.sin(angle)
             out[n.id] = (round(min(max(float(x), 0.0), 1.0), 4), round(min(max(float(y), 0.0), 1.0), 4))
     return out

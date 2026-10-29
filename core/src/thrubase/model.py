@@ -157,7 +157,7 @@ class Checkpoint:
 
     def public(self) -> dict[str, Any]:
         """The checkpoint as sent to clients: never the answer, hint or explanation."""
-        d = to_json(self)
+        d: dict[str, Any] = to_json(self)
         for k in ("answer", "explanation", "hint", "evidence_lines", "text"):
             d.pop(k, None)
         return d
@@ -206,7 +206,7 @@ class Trail:
         raise KeyError(checkpoint_id)
 
     def public(self) -> dict[str, Any]:
-        d = to_json(self)
+        d: dict[str, Any] = to_json(self)
         for seg, seg_d in zip(self.segments, d["segments"], strict=True):
             seg_d["checkpoints"] = [c.public() for c in seg.checkpoints]
         return d

@@ -82,7 +82,7 @@ class Climb:
         self.console.print(guide if guide else Text(self._t("climb.guide.none"), style="dim"))
         code = self.s.dispatch("segment.code", {"trailId": trail["id"], "order": seg["order"], "context": 3})
         lines = code["lines"]
-        shown = lines if len(lines) <= 80 else lines[:80] + ["…"]
+        shown = lines if len(lines) <= 80 else [*lines[:80], "…"]
         self.console.print(Syntax("\n".join(shown), "python", line_numbers=True, start_line=code["startLine"],
                                   highlight_lines=set(range(code["highlight"][0], code["highlight"][1] + 1)),
                                   word_wrap=False, theme="ansi_dark"))
@@ -102,7 +102,7 @@ class Climb:
             if raw == "q":
                 raise Quit()
             if raw == "s":
-                result = self.s.dispatch("checkpoint.skip", {"checkpointId": cp["id"]})
+                result: dict[str, Any] = self.s.dispatch("checkpoint.skip", {"checkpointId": cp["id"]})
                 self.console.print(Text(self._t("climb.skipped"), style="dim"))
                 return result
             if options:

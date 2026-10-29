@@ -45,10 +45,21 @@ class Context:
         self.index = self.map.node_index()
         self.calls_from: dict[str, list[Edge]] = defaultdict(list)
         self.callers_of: dict[str, list[Edge]] = defaultdict(list)
+        self.refs_to: dict[str, list[Edge]] = defaultdict(list)
+        self.members: dict[str, list[str]] = defaultdict(list)
         for e in self.edges:
-            if e.kind == "call" and e.dst is not None and e.resolved and not e.inferred and e.dst != e.src:
+            if e.dst is None or not e.resolved or e.inferred or e.dst == e.src:
+                continue
+            if e.kind == "call":
                 self.calls_from[e.src].append(e)
                 self.callers_of[e.dst].append(e)
+            elif e.kind == "ref":
+                self.refs_to[e.dst].append(e)
+        for n in self.map.nodes:
+            path, _, qual = n.id.rpartition("::")
+            parent = qual.rpartition(".")[0]
+            if parent and n.kind == "method":
+                self.members[f"{path}::{parent}"].append(n.id)
         for v in self.calls_from.values():
             v.sort(key=lambda e: (e.line, e.dst or ""))
 
@@ -156,18 +167,29 @@ def flow(ctx: Context, seg: Segment, next_nodes: list[str], cp_id: str, rng: ran
 
 
 def caller(ctx: Context, seg: Segment, prev_nodes: list[str], cp_id: str, rng: random.Random) -> Checkpoint | None:
-    """Fallback flow question for leaves: which option calls ``A``?"""
+    """Fallback flow question for leaves: which option calls ``A``? For a class: which option
+    creates it; for a function only passed around as a value: which option refers to it."""
     a = seg.nodes[0]
-    callers = list(dict.fromkeys(e.src for e in ctx.callers_of.get(a, [])))
+    a_node = ctx.index[a]
+    variant = "caller"
+    targets = [a]
+    if a_node.kind == "class":
+        variant = "creator"
+        targets += [m for m in ctx.members.get(a, []) if m.endswith(".__init__")]
+    edges = [e for t in targets for e in ctx.callers_of.get(t, [])]
+    if not edges:
+        edges = ctx.refs_to.get(a, [])
+        variant = "user" if edges else variant
+    callers = list(dict.fromkeys(e.src for e in edges if e.src not in targets))
     if not callers:
         return None
     answer = next((c for c in callers if c in prev_nodes), None) or max(
         callers, key=lambda c: (ctx.index[c].h, c))
     caller_set = set(callers)
-    a_node = ctx.index[a]
     pool = sorted(
         (n.id for n in ctx.map.nodes if n.kind in ("function", "method") and n.id not in caller_set
-         and n.id != a and ctx.calls_from.get(n.id)),
+         and n.id not in targets and ctx.calls_from.get(n.id)
+         and not any(e.dst in targets for e in ctx.refs_to.get(a, []) if e.src == n.id)),
         key=lambda nid: (nid.split("::")[0] != a_node.file, -ctx.index[nid].h, nid),
     )[:12]
     rng.shuffle(pool)
@@ -175,26 +197,47 @@ def caller(ctx: Context, seg: Segment, prev_nodes: list[str], cp_id: str, rng: r
     if not distractors:
         return None
     options, answer_id = _options(ctx, rng, answer, distractors)
-    line = ctx.first_call_line(answer, a) or 0
+    line = min(e.line for e in edges if e.src == answer)
     ans_node = ctx.index[answer]
     return _finish(Checkpoint(
         id=cp_id, type="flow", prompt="", node=a, options=options, answer=answer_id,
         evidence_lines=[line, line], file=ans_node.file,
-        text={"prompt": _text("cp.caller", a=ctx.label(a)),
+        text={"prompt": _text(f"cp.{variant}", a=ctx.label(a)),
               "hint": _text("hint.caller", a=ctx.label(a)),
-              "explanation": [_text("explain.caller", c=ctx.label(answer), a=ctx.label(a), line=line,
+              "explanation": [_text(f"explain.{variant}", c=ctx.label(answer), a=ctx.label(a), line=line,
                                     file=ans_node.file)]},
+    ))
+
+
+def locate_method(ctx: Context, seg: Segment, cp_id: str, rng: random.Random) -> Checkpoint | None:
+    """For a class: find where its most important method is defined."""
+    a = seg.nodes[0]
+    methods = [m for m in ctx.members.get(a, []) if ctx.index[m].file == ctx.index[a].file]
+    if len(methods) < 2:
+        return None
+    m = max(methods, key=lambda x: (ctx.index[x].h, x))
+    node = ctx.index[m]
+    cls = ctx.index[a]
+    return _finish(Checkpoint(
+        id=cp_id, type="locate", prompt="", node=a, answer=[[node.start_line, node.start_line]],
+        evidence_lines=[node.start_line, node.start_line], file=cls.file,
+        text={"prompt": _text("cp.locate.method", a=ctx.label(a), m=node.name),
+              "hint": _text("hint.locate", start=cls.start_line, end=cls.end_line),
+              "explanation": [_text("explain.locate.method", m=node.name, line=node.start_line)]},
     ))
 
 
 # --------------------------------------------------------------------------- locate
 
 
-def _locate_candidates(ctx: Context, seg: Segment, next_nodes: list[str]) -> list[tuple[str, list[list[int]], dict[str, str]]]:
+LocateCandidate = tuple[str, list[list[int]], dict[str, str]]
+
+
+def _locate_candidates(ctx: Context, seg: Segment, next_nodes: list[str]) -> list[LocateCandidate]:
     a = seg.nodes[0]
     node = ctx.index[a]
     pf = ctx.files.get(node.file)
-    out: list[tuple[str, list[list[int]], dict[str, str]]] = []
+    out: list[LocateCandidate] = []
     for b in next_nodes:
         lines = sorted({e.line for e in ctx.calls_from.get(a, []) if e.dst == b})
         if lines:
@@ -262,8 +305,13 @@ def diff_edge(ctx: Context, seg: Segment, cp_id: str, rng: random.Random) -> Che
     if ctx.diff is None:
         return None
     nodes = set(seg.nodes)
-    added = [e for e in ctx.diff.added_edges if e.src in nodes and e.dst in ctx.index and e.src in ctx.index]
-    removed = [e for e in ctx.diff.removed_edges if e.src in nodes and e.src in ctx.index]
+    if seg.isolated:
+        # A new isolated zone: ask which function stopped calling it.
+        added = []
+        removed = [e for e in ctx.diff.removed_edges if e.dst in nodes and e.src in ctx.index]
+    else:
+        added = [e for e in ctx.diff.added_edges if e.src in nodes and e.dst in ctx.index and e.src in ctx.index]
+        removed = [e for e in ctx.diff.removed_edges if e.src in nodes and e.src in ctx.index]
     # Only resolved edges are used (GraphDiff only carries resolved, non-inferred edges).
     choices: list[tuple[str, Any]] = [("added", e) for e in added] + [("removed", e) for e in removed]
     if not choices:
@@ -321,24 +369,26 @@ def generate(ctx: Context, segments: list[Segment], trail_key: str) -> None:
     main = [s for s in segments if not s.detour]
     for i, seg in enumerate(segments):
         rng = _rng(snapshot, seg.order)
-        if seg.detour:
-            later = [s for s in segments if s.order > seg.order]
-        else:
-            later = [s for s in main if s.order > seg.order]
+        later = [s for s in (segments if seg.detour else main) if s.order > seg.order]
         next_nodes = later[0].nodes if later else []
         earlier = [s for s in segments[:i] if not s.detour] or segments[:i]
         prev_nodes = earlier[-1].nodes if earlier else []
         base = f"{trail_key}:{seg.order}"
         cps: list[Checkpoint] = []
-        if seg.changed:
+        if seg.changed or seg.isolated:
             de = diff_edge(ctx, seg, f"{base}:d", rng)
             if de is not None:
                 cps.append(de)
-        static = (flow(ctx, seg, next_nodes, f"{base}:s", rng)
-                  or locate(ctx, seg, next_nodes, f"{base}:s", rng)
-                  or caller(ctx, seg, prev_nodes, f"{base}:s", rng)
-                  or locate(ctx, seg, next_nodes, f"{base}:s", rng, allow_easy=True)
-                  or locate_start(ctx, seg, f"{base}:s"))
+        if ctx.index[seg.nodes[0]].kind == "class":
+            static = (caller(ctx, seg, prev_nodes, f"{base}:s", rng)
+                      or locate_method(ctx, seg, f"{base}:s", rng)
+                      or locate_start(ctx, seg, f"{base}:s"))
+        else:
+            static = (flow(ctx, seg, next_nodes, f"{base}:s", rng)
+                      or locate(ctx, seg, next_nodes, f"{base}:s", rng)
+                      or caller(ctx, seg, prev_nodes, f"{base}:s", rng)
+                      or locate(ctx, seg, next_nodes, f"{base}:s", rng, allow_easy=True)
+                      or locate_start(ctx, seg, f"{base}:s"))
         cps.append(static)
         if len(cps) == 1 and static.type == "flow" and ctx.index[seg.nodes[0]].loc >= 25:
             extra = locate(ctx, seg, next_nodes, f"{base}:l", rng)

@@ -1,0 +1,39 @@
+{
+  "entries": [
+    "src/requests/certs.py::<module> (main-block)",
+    "src/requests/help.py::<module> (main-block)"
+  ],
+  "top10": [
+    "src/requests/sessions.py::Session.request",
+    "src/requests/exceptions.py::RequestException",
+    "src/requests/sessions.py::Session.send",
+    "src/requests/api.py::request",
+    "src/requests/exceptions.py::RequestException.__init__",
+    "src/requests/models.py::PreparedRequest.prepare",
+    "src/requests/sessions.py::SessionRedirectMixin.resolve_redirects",
+    "src/requests/utils.py::should_bypass_proxies",
+    "src/requests/sessions.py::Session.prepare_request",
+    "src/requests/sessions.py::Session.__init__"
+  ],
+  "resolution_rate": 0.883,
+  "files": 18,
+  "trail": [
+    "request",
+    "Session.request",
+    "Session.prepare_request",
+    "PreparedRequest.prepare",
+    "Session.merge_environment_settings",
+    "get_environ_proxies",
+    "should_bypass_proxies",
+    "Session.send",
+    "Session.get_adapter",
+    "RequestException.__init__",
+    "SessionRedirectMixin.resolve_redirects",
+    "RequestException"
+  ],
+  "checkpoints_per_segment": [
+    1,
+    2
+  ],
+  "review": "Implementer pre-review 2026-10-29 (gate 1 still needs a human sign-off): only main blocks are entry points (requests is a library); the trail starts at the exported API (requests.request) and follows Session.request -> prepare -> send -> adapter, which matches how the library is usually read. Top 10 is the request pipeline."
+}

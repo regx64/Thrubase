@@ -109,9 +109,9 @@ def _tokens(node: ts.Node, skip_nested: bool = True, skip: frozenset[str] = froz
 
 class PythonAdapter:
     name = "python"
-    version = "py-4"
-    extensions = (".py",)
-    excludes = (
+    version = "py-6"
+    extensions: tuple[str, ...] = (".py",)
+    excludes: tuple[str, ...] = (
         ".git/",
         ".hg/",
         ".venv/",
@@ -183,10 +183,7 @@ class PythonAdapter:
                 return qual_of[def_node.id]
             parts = [_text(def_node.child_by_field_name("name"))]
             p = _enclosing_def(def_node)
-            if p is not None:
-                q = f"{qualname(p)}.{parts[0]}"
-            else:
-                q = parts[0]
+            q = f"{qualname(p)}.{parts[0]}" if p is not None else parts[0]
             qual_of[def_node.id] = q
             return q
 
@@ -269,6 +266,12 @@ class PythonAdapter:
                         fn = right.child_by_field_name("function")
                         if fn is not None and fn.type in ("identifier", "attribute"):
                             value = "call:" + _compact(_text(fn))
+                    elif right.type == "identifier":
+                        # `self.bus = bus` takes the annotation of the parameter it came from
+                        owner_fn = _enclosing_def(caps["bind"][0])
+                        if owner_fn is not None and owner_fn.id in defs_by_node:
+                            ptype = pf.definitions[defs_by_node[owner_fn.id]].params.get(_text(right))
+                            value = f"ann:{ptype}" if ptype else ""
                     elif right.type == "await":
                         inner = right.named_children[0] if right.named_children else None
                         if inner is not None and inner.type == "call":
@@ -338,9 +341,16 @@ class PythonAdapter:
                 elif callee_node.type == "attribute":
                     obj = callee_node.child_by_field_name("object")
                     if obj is not None and obj.type == "call":
-                        inner = _compact(_text(obj.child_by_field_name("function")))
-                        attr = _text(callee_node.child_by_field_name("attribute"))
-                        callee = f"super().{attr}" if inner == "super" else f"<expr>{callee[:40]}"
+                        fn_node = obj.child_by_field_name("function")
+                        inner_fn = _compact(_text(fn_node))
+                        attr_text = _text(callee_node.child_by_field_name("attribute"))
+                        if inner_fn == "super":
+                            callee = f"super().{attr_text}"
+                        elif fn_node is not None and fn_node.type in ("identifier", "attribute"):
+                            # `Service(db).run()`: the method of whatever the call returns
+                            callee = f"{inner_fn}().{attr_text}"
+                        else:
+                            callee = f"<expr>{callee[:40]}"
                     elif obj is not None and obj.type in _LITERALS:
                         callee = f"<lit>{callee[:40]}"
                     elif obj is not None and obj.type not in ("identifier", "attribute"):
@@ -369,19 +379,19 @@ class PythonAdapter:
                 cond = _compact(_text(caps["main.cond"][0]))
                 if cond in ('__name__=="__main__"', "__name__=='__main__'",
                             '"__main__"==__name__', "'__main__'==__name__"):
-                    node = caps["main.block"][0]
-                    pf.extra["main_block"] = [_line(node), _end_line(node)]
+                    block = caps["main.block"][0]
+                    pf.extra["main_block"] = [_line(block), _end_line(block)]
             elif "assign.name" in caps:
                 name = _text(caps["assign.name"][0])
-                value = caps["assign.value"][0]
-                if value.type == "call":
-                    fn = value.child_by_field_name("function")
+                rhs = caps["assign.value"][0]
+                if rhs.type == "call":
+                    fn = rhs.child_by_field_name("function")
                     if fn is not None and fn.type in ("identifier", "attribute"):
                         pf.assignments[name] = "call:" + _compact(_text(fn))
-                elif value.type in ("identifier", "attribute"):
-                    pf.assignments[name] = "ref:" + _compact(_text(value))
-                if name == "urlpatterns" and value.type in ("list", "binary_operator"):
-                    pf.extra["urlpatterns"] = _url_refs(value)
+                elif rhs.type in ("identifier", "attribute"):
+                    pf.assignments[name] = "ref:" + _compact(_text(rhs))
+                if name == "urlpatterns" and rhs.type in ("list", "binary_operator"):
+                    pf.extra["urlpatterns"] = _url_refs(rhs)
 
         pf.definitions.sort(key=lambda d: (d.start_line, d.qualname))
         pf.calls.sort(key=lambda c: (c.line, c.col))

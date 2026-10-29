@@ -5,6 +5,7 @@ Paths are always POSIX and relative to the repository root. Symlinks are never f
 
 from __future__ import annotations
 
+import contextlib
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -35,17 +36,10 @@ class Collected:
 def _gitignore_lines(root: Path) -> list[str]:
     lines: list[str] = []
     gi = root / ".gitignore"
-    if gi.is_file():
-        try:
-            lines.extend(gi.read_text(encoding="utf-8", errors="replace").splitlines())
-        except OSError:
-            pass
-    info = root / ".git" / "info" / "exclude"
-    if info.is_file():
-        try:
-            lines.extend(info.read_text(encoding="utf-8", errors="replace").splitlines())
-        except OSError:
-            pass
+    for path in (gi, root / ".git" / "info" / "exclude"):
+        if path.is_file():
+            with contextlib.suppress(OSError):
+                lines.extend(path.read_text(encoding="utf-8", errors="replace").splitlines())
     return lines
 
 

@@ -66,13 +66,17 @@ include = ["src/thrubase", "tests", "schema", "README.md", "LICENSE", "pyproject
 exclude = ["src/thrubase/web/**"]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py310"
 src = ["src", "tests"]
+extend-exclude = ["tests/fixtures", "tests/validation/ai_service"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 ignore = ["RUF001", "RUF002", "RUF003", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["thrubase", "gen", "clients", "conftest"]
 
 [tool.mypy]
 python_version = "3.10"

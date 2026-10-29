@@ -61,8 +61,10 @@ def altitude(g: nx.DiGraph, loc: dict[str, int], weights: dict[str, float] | Non
     LOC so whole files do not dominate the terrain."""
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
     skip = skip or set()
-    fwd = _normalize(pagerank(g))
-    rev = _normalize(pagerank(g.reverse(copy=False)))
+    # Blend the raw ranks (both sum to 1) before normalizing, so a leaf that gets 1/6 of a
+    # driver's flow is not stretched to the same height as the driver.
+    fwd = pagerank(g)
+    rev = pagerank(g.reverse(copy=False))
     pr = _normalize({v: FORWARD_SHARE * fwd.get(v, 0) + (1 - FORWARD_SHARE) * rev.get(v, 0) for v in g.nodes})
     indeg_raw = {v: math.log1p(len({u for u in g.predecessors(v) if u != v})) for v in g.nodes}
     indeg = _normalize(indeg_raw)

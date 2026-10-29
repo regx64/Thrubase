@@ -14,7 +14,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..model import EdgeRef, GraphDiff
+from ..model import Edge, EdgeRef, GraphDiff
 from . import graph as gr
 from .collect import is_included
 from .index import SymbolIndex
@@ -196,9 +196,9 @@ def graph_diff(engine: Engine, analysis: Analysis, since: str | None = None) -> 
     index = SymbolIndex(base_files)
     by_adapter: dict[str, list[ParsedFile]] = {}
     for pf in base_files:
-        a = engine.registry.for_path(pf.path)
-        assert a is not None
-        by_adapter.setdefault(a.name, []).append(pf)
+        found = engine.registry.for_path(pf.path)
+        assert found is not None
+        by_adapter.setdefault(found.name, []).append(pf)
     base_edges = []
     base_roots: list[str] = []
     for name, group in sorted(by_adapter.items()):
@@ -241,7 +241,7 @@ def graph_diff(engine: Engine, analysis: Analysis, since: str | None = None) -> 
         removed = [r for r in removed if r not in renamed]
     # A renamed function whose body also changed is both renamed and changed.
 
-    def edge_set(edges: list, rename: dict[str, str]) -> dict[tuple[str, str], int]:
+    def edge_set(edges: list[Edge], rename: dict[str, str]) -> dict[tuple[str, str], int]:
         out: dict[tuple[str, str], int] = {}
         for e in edges:
             if e.kind != "call" or e.dst is None or not e.resolved or e.inferred or e.src == e.dst:
@@ -252,7 +252,8 @@ def graph_diff(engine: Engine, analysis: Analysis, since: str | None = None) -> 
 
     cur_edges = edge_set(analysis.edges, {})
     old_edges = edge_set(base_edges, renamed)
-    added_edges = [EdgeRef(src=s, dst=d, line=ln) for (s, d), ln in sorted(cur_edges.items()) if (s, d) not in old_edges]
+    added_edges = [EdgeRef(src=s, dst=d, line=ln) for (s, d), ln in sorted(cur_edges.items())
+                   if (s, d) not in old_edges]
     removed_edges = [EdgeRef(src=s, dst=d, line=ln) for (s, d), ln in sorted(old_edges.items())
                      if (s, d) not in cur_edges]
     new_isolated = sorted(n for n in m.isolated if n in old and n not in base_isolated)

@@ -12,6 +12,7 @@ import math
 from collections import defaultdict
 
 import numpy as np
+import numpy.typing as npt
 
 from ..model import Edge, Node
 
@@ -23,7 +24,10 @@ DENSE_LIMIT = 400
 SAMPLE = 192
 
 
-def _spring_sampled(n: int, adj: np.ndarray, gravity: np.ndarray, seed: int) -> np.ndarray:
+Array = npt.NDArray[np.float64]
+
+
+def _spring_sampled(n: int, adj: Array, gravity: Array, seed: int) -> Array:
     """Spring layout for many files: repulsion against a seeded random sample of nodes per
     iteration (O(n·s)), attraction along the sparse edges."""
     rng = np.random.default_rng(seed)
@@ -55,7 +59,7 @@ def _spring_sampled(n: int, adj: np.ndarray, gravity: np.ndarray, seed: int) -> 
     return pos
 
 
-def _spring(n: int, adj: np.ndarray, gravity: np.ndarray, seed: int) -> np.ndarray:
+def _spring(n: int, adj: Array, gravity: Array, seed: int) -> Array:
     if n > DENSE_LIMIT:
         return _spring_sampled(n, adj, gravity, seed)
     rng = np.random.default_rng(seed)
@@ -115,15 +119,15 @@ def layout(nodes: list[Node], edges: list[Edge], seed: int = SEED) -> dict[str, 
         order = np.argsort(dist, kind="stable")
         rank = np.empty(nf)
         rank[order] = np.arange(nf)
-        radius = 0.42 * np.sqrt((rank + 0.5) / nf)
-        angle = np.arctan2(rel[:, 1], rel[:, 0])
-        centers = 0.5 + np.stack([radius * np.cos(angle), radius * np.sin(angle)], axis=1)
+        ring = 0.42 * np.sqrt((rank + 0.5) / nf)
+        heading = np.arctan2(rel[:, 1], rel[:, 0])
+        centers = 0.5 + np.stack([ring * np.cos(heading), ring * np.sin(heading)], axis=1)
 
     total = sum(len(v) for v in by_file.values())
     out: dict[str, tuple[float, float]] = {}
     for f in files:
         members = sorted(by_file[f], key=lambda n: (-n.h, n.id))
-        cx, cy = centers[fidx[f]]
+        cx, cy = float(centers[fidx[f]][0]), float(centers[fidx[f]][1])
         radius = min(0.25, 0.35 * math.sqrt(len(members) / max(total, 1)) + 0.004 * math.sqrt(len(members)))
         for i, n in enumerate(members):
             if i == 0:

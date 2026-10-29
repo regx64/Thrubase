@@ -1,13 +1,13 @@
-**
-!dist/extension.js
-!media/**
-!l10n/**
-!package.json
-!package.nls.json
-!package.nls.ko.json
-!README.md
-!CHANGELOG.md
-!LICENSE
+src/**
+out/**
+node_modules/**
+.vscode-test/**
+.vscode/**
+dist/**/*.map
+tsconfig*.json
+esbuild.mjs
+package-lock.json
+*.vsix
 # Inside VS Code the UI uses the editor's own fonts; only the codicons are needed.
 media/map-view/fonts/PretendardVariable.woff2
 media/map-view/fonts/JetBrainsMono-latin-wght.woff2

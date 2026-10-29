@@ -58,8 +58,8 @@ Issues = "https://github.com/regx64/thrubase/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["src/thrubase"]
 # The map-view build output is copied into src/thrubase/web/ before building and is git-ignored,
-# so it has to be force-included explicitly.
-artifacts = ["src/thrubase/web/**"]
+# so it is listed as a build artifact (included even though VCS ignores it).
+artifacts = ["/src/thrubase/web/"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/thrubase", "tests", "schema", "README.md", "LICENSE", "pyproject.toml"]

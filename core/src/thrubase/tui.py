@@ -68,8 +68,9 @@ class Climb:
     def _segment(self, trail: dict[str, Any], seg: dict[str, Any], progress: dict[str, Any],
                  total: int) -> dict[str, Any]:
         self.console.rule()
-        number = self._t("climb.detour") if seg["detour"] else self._t("climb.segment", order=seg["order"],
-                                                                         total=total)
+        main = [x["order"] for x in trail["segments"] if not x["detour"]]
+        number = self._t("climb.detour") if seg["detour"] else self._t(
+            "climb.segment", order=main.index(seg["order"]) + 1, total=total)
         changed = f" · {self._t('climb.changed')}" if seg.get("changed") else ""
         self.console.print(Text(f"{number} · {seg['title']}{changed}", style="bold"))
         self.console.print(Text(f"{seg['file']}:{seg['start_line']}–{seg['end_line']}", style="dim"))

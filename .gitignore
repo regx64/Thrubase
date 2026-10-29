@@ -21,3 +21,5 @@ packages/map-view/dist/
 .vscode-test/
 test-results/
 playwright-report/
+packages/map-view/src/fonts/
+packages/map-view/src/tokens.css

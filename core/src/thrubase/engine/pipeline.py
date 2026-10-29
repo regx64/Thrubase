@@ -24,7 +24,7 @@ from .parse import ParsedFile, Parser, content_hash, normalize_source, parsed_fr
 
 ProgressFn = Callable[[str, int, int], None]
 #: bumped whenever graph, altitude or layout output changes, invalidating cached maps
-ENGINE_VERSION = "4"
+ENGINE_VERSION = "5"
 
 
 class Cancelled(Exception):

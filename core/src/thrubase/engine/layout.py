@@ -106,11 +106,18 @@ def layout(nodes: list[Node], edges: list[Edge], seed: int = SEED) -> dict[str, 
     gravity = 0.02 + 0.6 * file_h**2
     centers = _spring(nf, adj, gravity, seed)
 
-    # Normalize file centers into a margin so clusters fit inside 0..1.
-    lo = centers.min(axis=0)
-    span = np.maximum(centers.max(axis=0) - lo, 1e-9)
-    margin = 0.08
-    centers = margin + (centers - lo) / span * (1 - 2 * margin) if nf > 1 else centers
+    # Spread the files evenly over a disc while keeping each file's direction and its rank by
+    # distance from the middle: outliers (files nothing connects) no longer squeeze the rest
+    # into a dot, and high-altitude files stay near the center.
+    if nf > 1:
+        rel = centers - centers.mean(axis=0)
+        dist = np.sqrt((rel**2).sum(axis=1))
+        order = np.argsort(dist, kind="stable")
+        rank = np.empty(nf)
+        rank[order] = np.arange(nf)
+        radius = 0.42 * np.sqrt((rank + 0.5) / nf)
+        angle = np.arctan2(rel[:, 1], rel[:, 0])
+        centers = 0.5 + np.stack([radius * np.cos(angle), radius * np.sin(angle)], axis=1)
 
     total = sum(len(v) for v in by_file.values())
     out: dict[str, tuple[float, float]] = {}

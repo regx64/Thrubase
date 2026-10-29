@@ -180,7 +180,7 @@ def clone_public(url: str) -> Path:
     proc = subprocess.run(
         [git, "-c", "core.hooksPath=/dev/null", "-c", "protocol.file.allow=never", "clone", "--depth", "1",
          "--no-tags", "--single-branch", url, str(tmp / "repo")],
-        capture_output=True, env=env, check=False,
+        stdin=subprocess.DEVNULL, capture_output=True, env=env, check=False,
     )
     if proc.returncode != 0:
         remove_tree(tmp)

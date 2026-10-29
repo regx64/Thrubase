@@ -53,7 +53,10 @@ def _git(root: Path, *args: str, check: bool = True) -> bytes:
     if exe is None:
         raise GitMissing("git was not found on PATH")
     env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C"}
-    proc = subprocess.run([exe, "-C", str(root), *args], capture_output=True, env=env, check=False)
+    # stdin=DEVNULL: under `thrubase rpc` stdin is the protocol pipe, and on Windows a child that
+    # inherits it while the reader thread is blocked on it never starts.
+    proc = subprocess.run([exe, "-C", str(root), *args], stdin=subprocess.DEVNULL, capture_output=True, env=env,
+                          check=False)
     if check and proc.returncode != 0:
         raise GitError(proc.stderr.decode("utf-8", "replace").strip())
     return proc.stdout

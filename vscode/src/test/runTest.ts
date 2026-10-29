@@ -36,15 +36,27 @@ async function main() {
     extensionTestsEnv: { THRUBASE_HOME: home, THRUBASE_TEST_WORKSPACE: workspace },
   });
   // V9: command names and runtime strings in a Korean VS Code (needs the Korean language pack).
-  const [cli, ...cliArgs] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
-  const install = spawnSync(cli, [...cliArgs, '--install-extension', 'MS-CEINTL.vscode-language-pack-ko', '--force'],
-    { encoding: 'utf-8', stdio: 'inherit', shell: process.platform === 'win32' });
-  if (install.status !== 0) throw new Error('could not install the Korean language pack');
+  const installPack = (executable: string): string[] => {
+    const [cli, ...cliArgs] = resolveCliArgsFromVSCodeExecutablePath(executable);
+    const install = spawnSync(cli, [...cliArgs, '--install-extension', 'MS-CEINTL.vscode-language-pack-ko', '--force'],
+      { encoding: 'utf-8', stdio: 'inherit', shell: process.platform === 'win32' });
+    if (install.status !== 0) throw new Error('could not install the Korean language pack');
+    return cliArgs;
+  };
   // Language packs only apply to the VS Code minor version they were built for, and the
-  // Marketplace pack can lag behind stable: run the Korean suite on the pack's version.
+  // Marketplace pack can lag behind stable: run the Korean suite on the pack's version, and
+  // install the pack again with that version's CLI so it registers the translations.
+  const cliArgs = installPack(vscodeExecutablePath);
   const koVersion = process.env.VSCODE_KO_VERSION ?? languagePackVersion(cliArgs);
   console.log(`Korean run on VS Code ${koVersion ?? 'stable'}`);
   const koExecutable = koVersion ? await downloadAndUnzipVSCode(koVersion) : vscodeExecutablePath;
+  if (koExecutable !== vscodeExecutablePath) installPack(koExecutable);
+  await runTests({
+    vscodeExecutablePath: koExecutable,
+    extensionDevelopmentPath,
+    extensionTestsPath: resolve(__dirname, './warmup/index'),
+    launchArgs: [workspace, ...common, '--locale', 'ko'],
+  });
   await runTests({
     vscodeExecutablePath: koExecutable,
     extensionDevelopmentPath,

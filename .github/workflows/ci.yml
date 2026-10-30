@@ -1,0 +1,219 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  map-view:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/map-view
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/map-view/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: map-view
+          path: packages/map-view/dist
+          if-no-files-found: error
+
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ['3.10', '3.13']
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: core
+    env:
+      PYTHONUTF8: '1'
+      # The property test runs 1,000 random graphs once; other combinations run fewer.
+      THRUBASE_PROPERTY_EXAMPLES: ${{ matrix.os == 'ubuntu-latest' && matrix.python == '3.13' && '1000' || '100' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: core/pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: mypy
+      - run: pytest --cov=thrubase --cov-report=term --cov-fail-under=85
+
+  golden:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core
+    env:
+      THRUBASE_VALIDATION_DIR: ${{ github.workspace }}/.validation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: core/pyproject.toml
+      - uses: actions/cache@v4
+        with:
+          path: .validation
+          key: validation-${{ hashFiles('core/tests/validation/**') }}
+      - run: python -m pip install -e ".[dev]"
+      - run: python tests/validation/fetch.py "$THRUBASE_VALIDATION_DIR"
+      - run: pytest tests/test_golden.py -m golden
+      - name: Performance (synthetic 2,000-file repository)
+        run: THRUBASE_PERF_REPORT=perf.json pytest tests/test_perf.py -m perf -s
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-report
+          path: core/perf.json
+          if-no-files-found: ignore
+
+  wheel:
+    needs: map-view
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: map-view
+          path: core/src/thrubase/web
+      - name: Build the wheel and the sdist separately (the sdist carries sources only)
+        working-directory: core
+        run: |
+          python -m pip install build
+          python -m build --wheel
+          python -m build --sdist
+          python - <<'PY'
+          import glob, tarfile, zipfile
+          whl = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
+          assert "thrubase/web/index.html" in whl and "thrubase/web/assets/index.js" in whl, "web UI missing from wheel"
+          sdist = tarfile.open(glob.glob("dist/*.tar.gz")[0]).getnames()
+          assert not any("/thrubase/web/assets" in n for n in sdist), "build output in sdist"
+          print("wheel has the web UI; sdist has sources only")
+          PY
+      - name: The installed wheel serves the web UI without Node
+        run: |
+          python -m venv /tmp/w
+          /tmp/w/bin/pip install core/dist/*.whl
+          /tmp/w/bin/thrubase serve core/tests/fixtures/calls_app --port 8765 --no-open > serve.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8765/ > /dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:8765/ | grep -q '<div id="root">'
+          curl -sf http://127.0.0.1:8765/assets/index.js > /dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8765/api/initialize)" = "401"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: core/dist
+
+  vscode:
+    needs: map-view
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: vscode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: vscode/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: map-view
+          path: vscode/media/map-view
+      - name: Install the CLI the extension talks to
+        shell: bash
+        run: |
+          python -m pip install ../core
+          echo "THRUBASE_TEST_CLI=$(python -c 'import shutil; print(shutil.which("thrubase"))')" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run build
+      - name: Extension tests (@vscode/test-electron)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm test
+      - name: Extension tests (@vscode/test-electron)
+        if: runner.os != 'Linux'
+        run: npm test
+      - run: npx vsce package --no-dependencies
+        if: runner.os == 'Linux'
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: vsix
+          path: vscode/*.vsix
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      map-view: ${{ steps.filter.outputs.map-view }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            map-view:
+              - 'packages/map-view/**'
+
+  visual:
+    needs: changes
+    if: needs.changes.outputs.map-view == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/map-view
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/map-view/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Screenshots (light, dark, high contrast), axe and terrain frame time
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-results
+          path: |
+            packages/map-view/test-results
+            packages/map-view/tests/visual/__screenshots__

@@ -1,0 +1,623 @@
+{
+  "$defs": {
+    "Checkpoint": {
+      "properties": {
+        "answer": {},
+        "evidence_lines": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/Option"
+          },
+          "type": "array"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "text": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "type": {
+          "enum": [
+            "flow",
+            "locate",
+            "diff_edge"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "prompt",
+        "node"
+      ],
+      "type": "object"
+    },
+    "CheckpointState": {
+      "properties": {
+        "attempts": {
+          "type": "integer"
+        },
+        "state": {
+          "enum": [
+            "idle",
+            "hint",
+            "passed",
+            "revealed",
+            "skipped"
+          ]
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "Edge": {
+      "properties": {
+        "dst": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "external": {
+          "type": "boolean"
+        },
+        "inferred": {
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "call",
+            "inherit",
+            "ref"
+          ]
+        },
+        "line": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "boolean"
+        },
+        "src": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "kind",
+        "line",
+        "name"
+      ],
+      "type": "object"
+    },
+    "EdgeRef": {
+      "properties": {
+        "dst": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "src": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "line"
+      ],
+      "type": "object"
+    },
+    "GraphDiff": {
+      "properties": {
+        "added_edges": {
+          "items": {
+            "$ref": "#/$defs/EdgeRef"
+          },
+          "type": "array"
+        },
+        "added_nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "base": {
+          "type": "string"
+        },
+        "changed_files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "changed_nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "new_isolated": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "removed_edges": {
+          "items": {
+            "$ref": "#/$defs/EdgeRef"
+          },
+          "type": "array"
+        },
+        "removed_nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "renamed": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "base",
+        "changed_files",
+        "added_nodes",
+        "removed_nodes",
+        "changed_nodes",
+        "renamed",
+        "added_edges",
+        "removed_edges",
+        "new_isolated"
+      ],
+      "type": "object"
+    },
+    "Map": {
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/Edge"
+          },
+          "type": "array"
+        },
+        "entries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "isolated": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "library": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/Node"
+          },
+          "type": "array"
+        },
+        "repo": {
+          "$ref": "#/$defs/Repo"
+        },
+        "schema_version": {
+          "type": "integer"
+        },
+        "stats": {
+          "$ref": "#/$defs/Stats"
+        },
+        "summits": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "weights": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "repo",
+        "nodes",
+        "edges",
+        "entries",
+        "summits",
+        "isolated",
+        "stats"
+      ],
+      "type": "object"
+    },
+    "Node": {
+      "properties": {
+        "body_hash": {
+          "type": "string"
+        },
+        "end_line": {
+          "type": "integer"
+        },
+        "entry_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "file": {
+          "type": "string"
+        },
+        "h": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "module",
+            "class",
+            "function",
+            "method"
+          ]
+        },
+        "loc": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "qualname": {
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "enum": [
+                "entry",
+                "summit",
+                "isolated"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "start_line": {
+          "type": "integer"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "qualname",
+        "file",
+        "start_line",
+        "end_line",
+        "loc"
+      ],
+      "type": "object"
+    },
+    "Option": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "type": "object"
+    },
+    "Progress": {
+      "properties": {
+        "current": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "enum": [
+            "full",
+            "diff"
+          ]
+        },
+        "segments": {
+          "additionalProperties": {
+            "$ref": "#/$defs/SegmentProgress"
+          },
+          "type": "object"
+        },
+        "trail_id": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "trail_id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "Repo": {
+      "properties": {
+        "files": {
+          "type": "integer"
+        },
+        "languages": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "skipped": {
+          "type": "integer"
+        },
+        "snapshot": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "root",
+        "name",
+        "snapshot",
+        "files",
+        "skipped"
+      ],
+      "type": "object"
+    },
+    "Segment": {
+      "properties": {
+        "changed": {
+          "type": "boolean"
+        },
+        "checkpoints": {
+          "items": {
+            "$ref": "#/$defs/Checkpoint"
+          },
+          "type": "array"
+        },
+        "detour": {
+          "type": "boolean"
+        },
+        "end_line": {
+          "type": "integer"
+        },
+        "file": {
+          "type": "string"
+        },
+        "isolated": {
+          "type": "boolean"
+        },
+        "nodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "start_line": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "order",
+        "title",
+        "file",
+        "start_line",
+        "end_line",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "SegmentProgress": {
+      "properties": {
+        "checkpoints": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CheckpointState"
+          },
+          "type": "object"
+        },
+        "key": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "weak",
+            "skipped",
+            "todo"
+          ]
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object"
+    },
+    "Stats": {
+      "properties": {
+        "calls": {
+          "type": "integer"
+        },
+        "external_calls": {
+          "type": "integer"
+        },
+        "files": {
+          "type": "integer"
+        },
+        "parse_errors": {
+          "type": "integer"
+        },
+        "resolution_rate": {
+          "type": "number"
+        },
+        "resolved_calls": {
+          "type": "integer"
+        },
+        "seconds": {
+          "type": "number"
+        },
+        "skipped_files": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "files",
+        "skipped_files",
+        "parse_errors",
+        "calls",
+        "external_calls",
+        "resolved_calls",
+        "resolution_rate"
+      ],
+      "type": "object"
+    },
+    "Trail": {
+      "properties": {
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GraphDiff"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "full",
+            "diff"
+          ]
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "type": "integer"
+        },
+        "segments": {
+          "items": {
+            "$ref": "#/$defs/Segment"
+          },
+          "type": "array"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snapshot": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "snapshot",
+        "segments",
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/regx64/thrubase/schema/v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Map"
+    },
+    {
+      "$ref": "#/$defs/Trail"
+    },
+    {
+      "$ref": "#/$defs/Progress"
+    }
+  ],
+  "title": "Thrubase documents"
+}

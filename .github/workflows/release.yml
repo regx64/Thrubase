@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check_versions.py "${GITHUB_REF_NAME}"
+
+  build:
+    needs: versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build map-view into core and the extension
+        working-directory: packages/map-view
+        run: |
+          npm ci
+          npm run build
+          test -f ../../core/src/thrubase/web/index.html
+          test -f ../../vscode/media/map-view/index.html
+      - name: Build the wheel (with the web UI) and the sdist (sources only)
+        working-directory: core
+        run: |
+          python -m pip install build
+          python -m build --wheel
+          python -m build --sdist
+      - name: Package the extension
+        working-directory: vscode
+        run: |
+          npm ci
+          npx vsce package --no-dependencies -o thrubase-${GITHUB_REF_NAME#v}.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: core/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: vscode/*.vsix
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # PyPI Trusted Publishing (GitHub OIDC); no token stored
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  marketplace:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+          path: vsix
+      - name: Visual Studio Marketplace
+        run: npx --yes @vscode/vsce@3.3.2 publish --packagePath vsix/*.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Open VSX (Cursor, VSCodium)
+        run: npx --yes ovsx@0.10.2 publish vsix/*.vsix -p "$OVSX_PAT"
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+  github-release:
+    needs: [pypi, marketplace]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+          path: vsix
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+      - name: Changelog section for this version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="## $version" '$0==v{f=1;next} /^## /{f=0} f' CHANGELOG.md > notes.md
+          test -s notes.md || echo "Thrubase $version" > notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: |
+            vsix/*.vsix
+            dist/*

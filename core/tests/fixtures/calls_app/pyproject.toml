@@ -1,0 +1,6 @@
+[project]
+name = "calls-app"
+version = "0.0.0"
+
+[project.scripts]
+calls-app = "app.cli:main"

@@ -1,0 +1,15 @@
+{
+  "flask": {
+    "url": "https://github.com/pallets/flask.git",
+    "ref": "3.1.2",
+    "sha": "2c1b30d0503cfb064f1cb252e6614a06915a362a"
+  },
+  "requests": {
+    "url": "https://github.com/psf/requests.git",
+    "ref": "v2.32.3",
+    "sha": "0e322af87745eff34caffe4df68456ebc20d9068"
+  },
+  "ai-service": {
+    "build": "validation/build_ai_service.py"
+  }
+}

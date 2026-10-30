@@ -1,0 +1,44 @@
+{
+  "entries": [
+    "src/flask/__main__.py::<module> (main-module)",
+    "src/flask/cli.py::<module> (main-block)",
+    "src/flask/cli.py::main (script)",
+    "src/flask/cli.py::routes_command (cli)",
+    "src/flask/cli.py::run_command (cli)",
+    "src/flask/cli.py::shell_command (cli)"
+  ],
+  "top10": [
+    "src/flask/templating.py::DispatchingJinjaLoader.get_source",
+    "src/flask/app.py::Flask.ensure_sync",
+    "src/flask/app.py::Flask.wsgi_app",
+    "src/flask/templating.py::DispatchingJinjaLoader._get_source_explained",
+    "src/flask/sansio/blueprints.py::Blueprint.record_once",
+    "src/flask/json/tag.py::JSONTag",
+    "src/flask/app.py::Flask.full_dispatch_request",
+    "src/flask/templating.py::DispatchingJinjaLoader._get_source_fast",
+    "src/flask/app.py::Flask.__call__",
+    "src/flask/cli.py::FlaskGroup.__init__"
+  ],
+  "resolution_rate": 0.741,
+  "files": 24,
+  "trail": [
+    "src/flask/cli.py",
+    "FlaskGroup.__init__",
+    "Flask",
+    "SecureCookieSessionInterface",
+    "SecureCookieSessionInterface.save_session",
+    "Flask.create_url_adapter",
+    "Flask.__call__",
+    "Flask.wsgi_app",
+    "Flask.full_dispatch_request",
+    "Flask.ensure_sync",
+    "Flask.async_to_sync",
+    "render_template",
+    "_render"
+  ],
+  "checkpoints_per_segment": [
+    1,
+    2
+  ],
+  "review": "Implementer pre-review 2026-10-29 (gate 1 still needs a human sign-off): entries are the CLI (script, __main__, click commands). Top 10 mixes the request path (wsgi_app, full_dispatch_request, __call__) with the Jinja loader and blueprint plumbing; Flask is a library whose real entry points live in user code. Trail reads Flask.__call__ -> wsgi_app -> full_dispatch_request in call order."
+}

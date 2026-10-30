@@ -1,0 +1,6 @@
+[project]
+name = "scripts-pkg"
+version = "0.0.0"
+
+[project.scripts]
+scripts-pkg = "scripts_pkg.cli:main"

@@ -1,0 +1,53 @@
+from ..core.errors import Forbidden, NotFound
+from ..core.events import EventBus
+from ..db.session import Database
+from ..models.task import Task
+from ..models.user import User
+from ..repositories.projects import ProjectRepository
+from ..repositories.tasks import TaskRepository
+from ..schemas.task import TaskIn
+from ..utils.sorting import sort_by_priority
+
+
+class TaskService:
+    def __init__(self, db: Database, bus: EventBus) -> None:
+        self.tasks = TaskRepository(db)
+        self.projects = ProjectRepository(db)
+        self.bus = bus
+
+    def list_for_user(self, user: User) -> list[Task]:
+        tasks = self.tasks.for_user(user.id)
+        return sort_by_priority(tasks)
+
+    def create(self, user: User, body: TaskIn) -> Task:
+        project = self.projects.get(body.project_id)
+        if project is None or project.archived:
+            raise NotFound("project")
+        return self.tasks.insert(project.id, user.id, body.title, body.due, body.priority)
+
+    def _editable(self, user: User, task_id: int) -> Task:
+        task = self.tasks.get(task_id)
+        if task is None:
+            raise NotFound("task")
+        if not task.can_edit(user.id):
+            raise Forbidden("not your task")
+        return task
+
+    def complete(self, user: User, task_id: int) -> Task:
+        task = self._editable(user, task_id)
+        if task.done:
+            return task
+        self.tasks.mark_done(task.id)
+        self.bus.publish("task.completed", {"task_id": task.id, "user_id": user.id})
+        task.done = True
+        return task
+
+    def assign(self, user: User, task_id: int, assignee_id: int) -> Task:
+        task = self._editable(user, task_id)
+        self.tasks.set_assignee(task.id, assignee_id)
+        task.assignee_id = assignee_id
+        return task
+
+    def delete(self, user: User, task_id: int) -> None:
+        task = self._editable(user, task_id)
+        self.tasks.delete(task.id)

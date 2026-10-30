@@ -1,0 +1,21 @@
+{
+  "description": "Climb a codebase: a terrain map of the repository and guided reading trails with comprehension checkpoints, including a climb over the uncommitted changes an AI agent just made.",
+  "command.buildMap": "Build the terrain map",
+  "command.climbFull": "Start a full climb",
+  "command.climbDiff": "Start a diff climb",
+  "command.climbSince": "Start a diff climb since…",
+  "command.setApiKey": "Set the LLM key",
+  "command.clearApiKey": "Delete the LLM key",
+  "command.openPanel": "Open the terrain map",
+  "command.openSegment": "Open segment",
+  "view.trail": "Trail",
+  "view.map": "Terrain map",
+  "welcome.trail": "Read this repository along a trail of 12–15 segments, from its entry points to its summits.\n[$(debug-start) Start a full climb](command:thrubase.climbFull)\n[$(git-compare) Start a diff climb](command:thrubase.climbDiff)\nThrubase never runs your code. Nothing is sent anywhere unless you add an LLM key for guides.",
+  "config.cliPath": "Explicit path to the `thrubase` CLI. Empty: look on PATH, then in the pipx environment, then use `uvx thrubase`.",
+  "config.diffSuggestThreshold": "Number of changed functions and methods that makes the status bar suggest a diff climb.",
+  "config.llm.provider": "LLM provider for short segment guides. `none` keeps everything local; checkpoints work either way.",
+  "config.llm.model": "Model name. Empty: the provider default.",
+  "config.llm.endpoint": "Endpoint for `openai-compatible` providers, e.g. `http://localhost:11434/v1` for Ollama.",
+  "config.language": "Language of the Thrubase UI and questions. `auto` follows the VS Code display language.",
+  "color.segmentBackground": "Background of the current trail segment in the editor."
+}
